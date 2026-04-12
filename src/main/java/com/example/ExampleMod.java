@@ -23,7 +23,6 @@ public class ExampleMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        // РЕГИСТРАЦИЯ КНОПКИ M
         configKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.helper.open", GLFW.GLFW_KEY_M, "category.helper"
         ));
@@ -32,23 +31,17 @@ public class ExampleMod implements ClientModInitializer {
             while (configKey.wasPressed()) {
                 client.setScreen(new HelperScreen());
             }
-
             if (delayTicks > 0) {
                 delayTicks--;
                 if (delayTicks == 0 && active) executeAutoSell(client);
             }
         });
 
-        // СКАНЕР ЧАТА
         ClientReceiveMessageEvents.CHAT.register((message, signed, sender, params, time) -> {
             String fullText = message.getString();
-            
             if (debugMode && MinecraftClient.getInstance().player != null) {
-                MinecraftClient.getInstance().player.sendMessage(
-                    Text.literal("§7[SCANNER] Пришло: §f\"" + fullText + "\""), false
-                );
+                MinecraftClient.getInstance().player.sendMessage(Text.literal("§7[SCANNER] Пришло: §f\"" + fullText + "\""), false);
             }
-
             if (active && fullText.toLowerCase().contains("у вас купили")) {
                 delayTicks = 40; 
             }
@@ -64,53 +57,78 @@ public class ExampleMod implements ClientModInitializer {
             }
         }
         if (slot != -1) {
-            if (slot > 8) {
-                mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slot, 0, SlotActionType.SWAP, mc.player);
-            }
+            if (slot > 8) mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slot, 0, SlotActionType.SWAP, mc.player);
             mc.getNetworkHandler().sendChatCommand("ah sell " + price);
         }
     }
 
-    // КЛАСС МЕНЮ
+    // --- КРУТАЯ МЕНЮШКА ---
     public static class HelperScreen extends Screen {
-        private float animX = -200;
+        private long startTime;
+        private String playerName;
 
         public HelperScreen() {
             super(Text.literal("Helper Menu"));
+            this.startTime = System.currentTimeMillis();
+            this.playerName = MinecraftClient.getInstance().getSession().getUsername();
         }
 
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-            if (animX < 0) animX += delta * 15;
-            if (animX > 0) animX = 0;
-            int x = (int) animX;
+            long elapsed = System.currentTimeMillis() - startTime;
+            
+            // 1. Черный фон (плавное появление)
+            float bgAlpha = Math.min(elapsed / 500f, 0.8f);
+            context.fill(0, 0, width, height, (int)(bgAlpha * 255) << 24);
 
-            // Фон
-            context.fill(x + 10, 10, x + 150, height - 10, 0xCC000000);
-            context.drawText(client.textRenderer, "§6§lFT HELPER", x + 20, 20, 0xFFFFFF, true);
+            // 2. ПРИВЕТСТВИЕ (первые 1.5 секунды)
+            if (elapsed < 1500) {
+                float textAlpha = 0;
+                if (elapsed < 500) textAlpha = elapsed / 500f; // Появление
+                else if (elapsed < 1000) textAlpha = 1f; // Удержание
+                else textAlpha = 1f - (elapsed - 1000) / 500f; // Исчезновение
 
-            // Кнопка Сканера
-            int btnColor = debugMode ? 0xFF55FF55 : 0xFFFF5555;
-            context.fill(x + 20, 40, x + 140, 60, 0x44FFFFFF);
-            context.drawText(client.textRenderer, "Сканер: " + (debugMode ? "ВКЛ" : "ВЫКЛ"), x + 25, 46, btnColor, false);
+                int color = ((int)(textAlpha * 255) << 24) | 0xFFFFFF;
+                context.drawCenteredTextWithShadow(client.textRenderer, "Привет, " + playerName, width / 2, height / 2 - 10, color);
+            } 
+            // 3. ОСНОВНЫЕ ФУНКЦИИ (появляются после 1.2 сек)
+            else {
+                float menuElapsed = elapsed - 1200;
+                
+                // Заголовок (выезжает слева)
+                int titleX = (int) Math.min(-100 + (menuElapsed / 300f) * 120, 20);
+                context.drawText(client.textRenderer, "§6§lFT HELPER", titleX, 20, 0xFFFFFF, true);
 
-            // Сетка инвентаря
-            context.drawText(client.textRenderer, "Выбери предмет:", x + 20, 75, 0xAAAAAA, false);
-            if (client.player != null) {
-                for (int i = 0; i < 9; i++) {
-                    int row = i / 3;
-                    int col = i % 3;
-                    int itemX = x + 25 + (col * 35);
-                    int itemY = 90 + (row * 35);
+                // Кнопка Сканера (лесенка +100мс)
+                if (menuElapsed > 100) {
+                    int btnX = (int) Math.min(-150 + ((menuElapsed - 100) / 300f) * 170, 20);
+                    int btnColor = debugMode ? 0xFF55FF55 : 0xFFFF5555;
+                    context.fill(btnX, 40, btnX + 120, 60, 0x44FFFFFF);
+                    context.drawText(client.textRenderer, "Сканер: " + (debugMode ? "ВКЛ" : "ВЫКЛ"), btnX + 5, 46, btnColor, false);
+                }
+
+                // Инвентарь (лесенка +200мс)
+                if (menuElapsed > 200) {
+                    int invX = (int) Math.min(-200 + ((menuElapsed - 200) / 300f) * 220, 20);
+                    context.drawText(client.textRenderer, "Выбери предмет:", invX, 75, 0xAAAAAA, false);
                     
-                    ItemStack stack = client.player.getInventory().getStack(i);
-                    context.fill(itemX, itemY, itemX + 32, itemY + 32, 0x33FFFFFF);
-                    
-                    // В 1.21.4 используем простой drawItem
-                    context.drawItem(stack, itemX + 8, itemY + 8);
-                    
-                    if (!stack.isEmpty() && stack.getName().getString().equals(itemToSell)) {
-                        context.drawBorder(itemX, itemY, 32, 32, 0xFF55FF55);
+                    for (int i = 0; i < 9; i++) {
+                        int row = i / 3;
+                        int col = i % 3;
+                        int itemX = invX + (col * 35);
+                        int itemY = 90 + (row * 35);
+                        
+                        // Плавное появление самих слотов
+                        float itemAlpha = Math.min((menuElapsed - 200 - (i * 50)) / 300f, 1f);
+                        if (itemAlpha > 0) {
+                            ItemStack stack = client.player.getInventory().getStack(i);
+                            context.fill(itemX, itemY, itemX + 32, itemY + 32, (int)(itemAlpha * 51) << 24 | 0xFFFFFF);
+                            context.drawItem(stack, itemX + 8, itemY + 8);
+                            
+                            if (!stack.isEmpty() && stack.getName().getString().equals(itemToSell)) {
+                                context.drawBorder(itemX, itemY, 32, 32, 0xFF55FF55);
+                            }
+                        }
                     }
                 }
             }
@@ -119,6 +137,9 @@ public class ExampleMod implements ClientModInitializer {
 
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
+            long elapsed = System.currentTimeMillis() - startTime;
+            if (elapsed < 1200) return false; // Не даем кликать пока идет приветствие
+
             if (mouseX > 20 && mouseX < 140 && mouseY > 40 && mouseY < 60) {
                 debugMode = !debugMode;
                 return true;
@@ -127,14 +148,14 @@ public class ExampleMod implements ClientModInitializer {
             for (int i = 0; i < 9; i++) {
                 int row = i / 3;
                 int col = i % 3;
-                int itemX = 25 + (col * 35);
+                int itemX = 20 + (col * 35);
                 int itemY = 90 + (row * 35);
                 if (mouseX > itemX && mouseX < itemX + 32 && mouseY > itemY && mouseY < itemY + 32) {
                     ItemStack clickedStack = client.player.getInventory().getStack(i);
                     if (!clickedStack.isEmpty()) {
                         itemToSell = clickedStack.getName().getString();
                         active = true;
-                        client.player.sendMessage(Text.literal("§a[Helper] Мониторим: " + itemToSell), false);
+                        client.player.sendMessage(Text.literal("§a[FT] Цель: " + itemToSell), false);
                         client.player.closeScreen();
                     }
                     return true;
