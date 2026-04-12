@@ -17,21 +17,27 @@ public class ExampleMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        // Команды на точку (локальные)
         ClientSendMessageEvents.ALLOW_CHAT.register((msg) -> {
             if (msg.startsWith(".")) {
                 processCommand(msg);
-                return false;
+                return false; // Блокируем отправку точки на сервер
             }
             return true;
         });
 
+        // Детектор чата с проверкой на любую позицию фразы
         ClientReceiveMessageEvents.CHAT.register((message, signed, sender, params, time) -> {
-            String text = message.getString().toLowerCase();
-            if (active && text.contains("у вас купили")) {
+            String fullText = message.getString().toLowerCase(); // Весь текст в нижний регистр для точности
+            
+            // Проверяем, есть ли заветная фраза в сообщении
+            if (active && fullText.contains("у вас купили")) {
+                // Ставим задержку (40 тиков = ~2 сек), чтобы античит не ругался
                 delayTicks = 40; 
             }
         });
 
+        // Тик-менеджер для выполнения действий после задержки
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (delayTicks > 0) {
                 delayTicks--;
@@ -47,7 +53,7 @@ public class ExampleMod implements ClientModInitializer {
         if (mc.player == null) return;
 
         if (msg.equals(".")) {
-            mc.player.sendMessage(Text.literal("§6[Helper] Предметы в хотбаре:"), false);
+            mc.player.sendMessage(Text.literal("§6[FT-Helper] Хотбар:"), false);
             for (int i = 0; i < 9; i++) {
                 ItemStack is = mc.player.getInventory().getStack(i);
                 mc.player.sendMessage(Text.literal("§e" + (i + 1) + ". " + is.getName().getString()), false);
@@ -57,9 +63,16 @@ public class ExampleMod implements ClientModInitializer {
                 int slot = Integer.parseInt(msg.split(" ")[1]) - 1;
                 itemToSell = mc.player.getInventory().getStack(slot).getName().getString();
                 active = true;
-                mc.player.sendMessage(Text.literal("§a[Helper] Мониторим: " + itemToSell), false);
+                mc.player.sendMessage(Text.literal("§a[FT-Helper] Цель: " + itemToSell), false);
             } catch (Exception e) {
-                mc.player.sendMessage(Text.literal("§cЮзай: .set [1-9]"), false);
+                mc.player.sendMessage(Text.literal("§cОшибка! Используй: .set [номер]"), false);
+            }
+        } else if (msg.startsWith(".price ")) {
+            try {
+                price = Integer.parseInt(msg.split(" ")[1]);
+                mc.player.sendMessage(Text.literal("§a[FT-Helper] Новая цена: " + price), false);
+            } catch (Exception e) {
+                mc.player.sendMessage(Text.literal("§cОшибка! Используй: .price [число]"), false);
             }
         }
     }
@@ -68,6 +81,7 @@ public class ExampleMod implements ClientModInitializer {
         if (mc.player == null || mc.interactionManager == null) return;
         
         int slot = -1;
+        // Ищем предмет по всему инвентарю (0-35)
         for (int i = 0; i < 36; i++) {
             if (mc.player.getInventory().getStack(i).getName().getString().equals(itemToSell)) {
                 slot = i;
@@ -76,14 +90,17 @@ public class ExampleMod implements ClientModInitializer {
         }
 
         if (slot != -1) {
-            if (slot > 8) {
+            // Если предмет в инвентаре, но не в первом слоте хотбара - свапаем его туда
+            if (slot != 0) {
                 mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slot, 0, SlotActionType.SWAP, mc.player);
             }
+            
+            // Небольшая доп задержка после свапа может понадобиться, но попробуем так
             mc.getNetworkHandler().sendChatCommand("ah sell " + price);
-            mc.player.sendMessage(Text.literal("§b[Helper] Выставил предмет!"), false);
+            mc.player.sendMessage(Text.literal("§b[FT-Helper] Авто-выставление: " + itemToSell), false);
         } else {
             active = false;
-            mc.player.sendMessage(Text.literal("§c[Helper] Предмет закончился."), false);
+            mc.player.sendMessage(Text.literal("§c[FT-Helper] Предметы закончились! Отдыхаем."), false);
         }
     }
 }
