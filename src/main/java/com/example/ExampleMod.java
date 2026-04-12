@@ -3,56 +3,44 @@ package net.fabricmc.example;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.Items;
 import net.minecraft.util.Hand;
 import org.lwjgl.glfw.GLFW;
 
 public class ExampleMod implements ClientModInitializer {
-    // Переменная, чтобы перки не вылетали пачкой, пока держишь кнопку
-    private boolean mouseWasDown = false;
+    private boolean isDown = false;
 
     @Override
     public void onInitializeClient() {
+        // Используем более легкий метод проверки
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client.player == null || client.world == null || client.currentScreen != null) return;
+            if (client.player == null || client.currentScreen != null) return;
 
-            // Проверяем нажатие СКМ (Middle Click) через GLFW
-            boolean isMouseDown = GLFW.glfwGetMouseButton(client.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS;
+            // Проверка через GLFW только если окно активно
+            boolean pressed = GLFW.glfwGetMouseButton(client.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS;
 
-            if (isMouseDown && !mouseWasDown) {
-                throwPearl(client);
-                mouseWasDown = true;
-            } else if (!isMouseDown) {
-                mouseWasDown = false;
+            if (pressed && !isDown) {
+                isDown = true;
+                // Запускаем через планировщик клиента, чтобы не фризить основной поток
+                client.execute(() -> {
+                    int oldSlot = client.player.getInventory().selectedSlot;
+                    int pearlSlot = findPearl(client);
+                    if (pearlSlot != -1) {
+                        client.player.getInventory().selectedSlot = pearlSlot;
+                        client.interactionManager.interactItem(client.player, Hand.MAIN_HAND);
+                        client.player.getInventory().selectedSlot = oldSlot;
+                    }
+                });
+            } else if (!pressed) {
+                isDown = false;
             }
         });
     }
 
-    private void throwPearl(MinecraftClient client) {
-        PlayerInventory inventory = client.player.getInventory();
-        int oldSlot = inventory.selectedSlot;
-        int pearlSlot = -1;
-
-        // Ищем эндер-перл в хотбаре (слоты 0-8)
+    private int findPearl(MinecraftClient client) {
         for (int i = 0; i < 9; i++) {
-            if (inventory.getStack(i).isOf(Items.ENDER_PEARL)) {
-                pearlSlot = i;
-                break;
-            }
+            if (client.player.getInventory().getStack(i).isOf(Items.ENDER_PEARL)) return i;
         }
-
-        // Если нашли перку
-        if (pearlSlot != -1) {
-            // 1. Быстро переключаемся на слот с перкой
-            inventory.selectedSlot = pearlSlot;
-            
-            // 2. Используем предмет (кидаем)
-            // interactionManager делает это правильно, чтобы сервер засчитал бросок
-            client.interactionManager.interactItem(client.player, Hand.MAIN_HAND);
-            
-            // 3. Сразу возвращаем старый предмет в руки
-            inventory.selectedSlot = oldSlot;
-        }
+        return -1;
     }
 }
