@@ -18,17 +18,16 @@ public class ExampleMod implements ClientModInitializer {
     public static String itemToSell = "";
     public static int price = 20000;
     public static boolean active = false;
-    public static boolean debugMode = false; // Тот самый сканер
+    public static boolean debugMode = false;
     private int delayTicks = -1;
 
     @Override
     public void onInitializeClient() {
-        // 1. Регистрация кнопки G
+        // Регистрация кнопки G
         configKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "Открыть Хелпер", GLFW.GLFW_KEY_G, "FunTime Helper"
+                "key.helper.open", GLFW.GLFW_KEY_G, "category.helper"
         ));
 
-        // 2. Открытие меню по нажатию
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (configKey.wasPressed()) {
                 client.setScreen(new HelperScreen());
@@ -40,25 +39,24 @@ public class ExampleMod implements ClientModInitializer {
             }
         });
 
-        // 3. Сканер чата
+        // Сканер чата
         ClientReceiveMessageEvents.CHAT.register((message, signed, sender, params, time) -> {
             String fullText = message.getString();
             
-            // Если включен дебаг - пишем в чат всё что видим в ковычках
-            if (debugMode) {
+            if (debugMode && MinecraftClient.getInstance().player != null) {
                 MinecraftClient.getInstance().player.sendMessage(
-                    Text.literal("§7[DEBUG] Пришло: §f\"" + fullText + "\""), false
+                    Text.literal("§7[SCANNER] Пришло: §f\"" + fullText + "\""), false
                 );
             }
 
             if (active && fullText.toLowerCase().contains("у вас купили")) {
-                delayTicks = 30; 
+                delayTicks = 40; 
             }
         });
     }
 
     private void executeAutoSell(MinecraftClient mc) {
-        if (mc.player == null) return;
+        if (mc.player == null || mc.interactionManager == null) return;
         int slot = -1;
         for (int i = 0; i < 36; i++) {
             if (mc.player.getInventory().getStack(i).getName().getString().equals(itemToSell)) {
@@ -66,49 +64,52 @@ public class ExampleMod implements ClientModInitializer {
             }
         }
         if (slot != -1) {
-            if (slot > 8) mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slot, 0, SlotActionType.SWAP, mc.player);
+            if (slot > 8) {
+                mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slot, 0, SlotActionType.SWAP, mc.player);
+            }
             mc.getNetworkHandler().sendChatCommand("ah sell " + price);
         }
     }
 
-    // --- ВНУТРЕННИЙ КЛАСС МЕНЮ ---
+    // Класс экрана
     public static class HelperScreen extends Screen {
-        private float animProgress = 0; // Для анимации вылета
+        private float animX = -200;
 
-        protected HelperScreen() {
+        public HelperScreen() {
             super(Text.literal("Helper Menu"));
         }
 
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-            // Анимация: двигаем меню слева направо
-            if (animProgress < 1.0f) animProgress += delta * 0.1f;
-            int xOffset = (int) ((1.0f - animProgress) * -200);
+            // Плавная анимация вылета
+            if (animX < 0) animX += delta * 15;
+            if (animX > 0) animX = 0;
 
-            // Фон меню
-            context.fill(xOffset + 10, 10, xOffset + 160, height - 10, 0xAA000000);
-            context.drawText(context.textRenderer, "§6§lFT HELPER", xOffset + 20, 20, 0xFFFFFF, true);
+            int x = (int) animX;
+
+            // Рисуем фон (черный полупрозрачный)
+            context.fill(x + 10, 10, x + 150, height - 10, 0xCC000000);
+            context.drawText(client.textRenderer, "§6§lFT HELPER", x + 20, 20, 0xFFFFFF, true);
 
             // Кнопка Сканера
-            int debugColor = debugMode ? 0xFF55FF55 : 0xFFFF5555;
-            context.fill(xOffset + 20, 40, xOffset + 150, 60, 0x44FFFFFF);
-            context.drawText(context.textRenderer, "Сканер: " + (debugMode ? "ВКЛ" : "ВЫКЛ"), xOffset + 30, 45, debugColor, false);
+            int btnColor = debugMode ? 0xFF55FF55 : 0xFFFF5555;
+            context.fill(x + 20, 40, x + 140, 60, 0x44FFFFFF);
+            context.drawText(client.textRenderer, "Сканер: " + (debugMode ? "ВКЛ" : "ВЫКЛ"), x + 25, 46, btnColor, false);
 
-            // Отрисовка инвентаря (хотбара) для выбора
-            context.drawText(context.textRenderer, "Выбери предмет:", xOffset + 20, 75, 0xAAAAAA, false);
+            // Сетка хотбара (3x3 для удобства)
+            context.drawText(client.textRenderer, "Выбери предмет:", x + 20, 75, 0xAAAAAA, false);
             for (int i = 0; i < 9; i++) {
                 int row = i / 3;
                 int col = i % 3;
-                int x = xOffset + 25 + (col * 35);
-                int y = 90 + (row * 35);
+                int itemX = x + 25 + (col * 35);
+                int itemY = 90 + (row * 35);
                 
                 ItemStack stack = client.player.getInventory().getStack(i);
-                context.fill(x, y, x + 32, y + 32, 0x33FFFFFF);
-                context.drawItem(stack, x + 8, y + 8);
+                context.fill(itemX, itemY, itemX + 32, itemY + 32, 0x33FFFFFF);
+                context.drawItem(stack, itemX + 8, itemY + 8);
                 
-                // Если этот предмет выбран - подсвечиваем
                 if (stack.getName().getString().equals(itemToSell)) {
-                    context.drawBorder(x, y, 32, 32, 0xFF55FF55);
+                    context.drawBorder(itemX, itemY, 32, 32, 0xFF55FF55);
                 }
             }
             super.render(context, mouseX, mouseY, delta);
@@ -116,27 +117,29 @@ public class ExampleMod implements ClientModInitializer {
 
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            // Логика нажатия на кнопку сканера
-            if (mouseX > 20 && mouseX < 150 && mouseY > 40 && mouseY < 60) {
+            // Клик по сканеру
+            if (mouseX > 20 && mouseX < 140 && mouseY > 40 && mouseY < 60) {
                 debugMode = !debugMode;
-                client.player.sendMessage(Text.literal("§eСканер: " + (debugMode ? "§aВКЛ" : "§cВЫКЛ")), false);
                 return true;
             }
 
-            // Логика выбора предмета из сетки
+            // Выбор слота
             for (int i = 0; i < 9; i++) {
                 int row = i / 3;
                 int col = i % 3;
-                int x = 25 + (col * 35);
-                int y = 90 + (row * 35);
-                if (mouseX > x && mouseX < x + 32 && mouseY > y && mouseY < y + 32) {
+                int itemX = 25 + (col * 35);
+                int itemY = 90 + (row * 35);
+                if (mouseX > itemX && mouseX < itemX + 32 && mouseY > itemY && mouseY < itemY + 32) {
                     itemToSell = client.player.getInventory().getStack(i).getName().getString();
                     active = true;
-                    client.player.sendMessage(Text.literal("§a[Helper] Выбрано: " + itemToSell), false);
+                    client.player.closeScreen(); // Закрываем после выбора
                     return true;
                 }
             }
             return super.mouseClicked(mouseX, mouseY, button);
         }
+
+        @Override
+        public boolean shouldPause() { return false; } // Чтобы игра не вставала на паузу
     }
 }
