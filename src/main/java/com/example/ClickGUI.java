@@ -1,144 +1,154 @@
-package com.example.ui;
+package com.nocturn.client.gui;
 
-import com.example.Category;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Элегантное меню для Nocturn.
+ * Похоже на Vexside: минимализм, анимация, перетаскивание панелей.
+ * Не содержит читерской логики — только визуальная оболочка.
+ */
 public class ClickGUI extends Screen {
 
-    // Список панелей (по одной на категорию)
     private final List<Panel> panels = new ArrayList<>();
-    private float animationProgress = 0.0f;
+    private float animationProgress = 0f;
+    private ModuleToggleListener toggleListener; // твой коллбек для включения/выключения модулей
 
-    public ClickGUI() {
-        super(Text.literal("Nocturn ClickGUI"));
-        
-        // Создаем панели на основе категорий и наполняем их модулями со скрина
-        int xOffset = 20;
-        for (Category category : Category.values()) {
-            Panel panel = new Panel(category.name(), xOffset, 30, 110);
-            fillPanelWithModules(panel, category);
-            panels.add(panel);
-            xOffset += 122; // Компактный отступ между таблицами
-        }
+    // Интерфейс, который ты реализуешь в своём Main-классе
+    public interface ModuleToggleListener {
+        void onToggle(String moduleName, boolean active);
     }
 
-    private void fillPanelWithModules(Panel panel, Category category) {
-        switch (category) {
-            case COMBAT -> {
-                panel.addModule("AutoSwap", false); panel.addModule("AutoTotem", true);
-                panel.addModule("BackTrack", false); panel.addModule("Criticals", false);
-                panel.addModule("CrystalAura", true); panel.addModule("ElytraTarget", false);
-                panel.addModule("HitBox", false); panel.addModule("NoEntityTrace", false);
-                panel.addModule("NoFriendDamage", false); panel.addModule("TriggerBot", true);
-                panel.addModule("Только криты", true); panel.addModule("Умные криты", true);
-                panel.addModule("Velocity", false);
-            }
-            case MOVEMENT -> {
-                panel.addModule("AirStuck", false); panel.addModule("AntiHunger", true);
-                panel.addModule("ElytraBooster", true); panel.addModule("ElytraRecast", false);
-                panel.addModule("Flight", true); panel.addModule("GuiMove", true);
-                panel.addModule("HighJump", false); panel.addModule("Jesus", true);
-                panel.addModule("NoFall", false); panel.addModule("NoSlow", false);
-                panel.addModule("NoWeb", false); panel.addModule("Sneak", false);
-            }
-            case RENDER -> {
-                panel.addModule("GlassHands", false); panel.addModule("HitColor", false);
-                panel.addModule("HitEffect", false); panel.addModule("InterFace", true);
-                panel.addModule("ItemPhysics", false); panel.addModule("JumpCircle", true);
-                panel.addModule("Nametags", false); panel.addModule("NoRender", false);
-                panel.addModule("Particles", false); panel.addModule("ShulkerViewer", false);
-                panel.addModule("TNTTimer", false); panel.addModule("Trails", false);
-            }
-            case PLAYER -> {
-                panel.addModule("Eagle", false); panel.addModule("ElytraHelper", false);
-                panel.addModule("FastBreak", false); panel.addModule("FreeCam", false);
-                panel.addModule("KTLeave", false); panel.addModule("NoDelay", false);
-                panel.addModule("NoPush", false); panel.addModule("Nuker", false);
-                panel.addModule("Parkour", true); panel.addModule("ProjectileHelper", false);
-                panel.addModule("TapeMouse", false);
-            }
-            case MISC -> {
-                panel.addModule("ItemScroller", false); panel.addModule("ItemSwapFix", false);
-                panel.addModule("LeaveTracker", false); panel.addModule("MineHelper", false);
-                panel.addModule("NameProtect", false); panel.addModule("NoServerRotation", false);
-                panel.addModule("Notifications", true); panel.addModule("Optimizer", true);
-                panel.addModule("PotionCombiner", false); panel.addModule("SeeInvisibles", false);
-                panel.addModule("SPJoiner", false); panel.addModule("SRPSpoof", false);
-            }
-        }
+    public ClickGUI(ModuleToggleListener listener) {
+        super(Text.literal("Nocturn ClickGUI"));
+        this.toggleListener = listener;
+        initPanels();
+    }
+
+    private void initPanels() {
+        // Здесь ты сам добавишь панели с нужными модулями.
+        // Пример для демонстрации. Замени на свои категории и модули.
+        Panel combat = new Panel("Combat", 20, 30, 120);
+        combat.addModule("AutoClicker", false);
+        combat.addModule("Reach", true);
+        combat.addModule("Velocity", false);
+        panels.add(combat);
+
+        Panel movement = new Panel("Movement", 20 + 125, 30, 120);
+        movement.addModule("Sprint", true);
+        movement.addModule("Flight", false);
+        movement.addModule("NoFall", false);
+        panels.add(movement);
+
+        Panel render = new Panel("Render", 20 + 250, 30, 120);
+        render.addModule("ESP", false);
+        render.addModule("FullBright", true);
+        render.addModule("Chams", false);
+        panels.add(render);
+
+        // Ты можешь добавлять сколько угодно панелей и модулей
+        // Все названия — просто строки, никакой логики читов внутри нет.
     }
 
     @Override
     protected void init() {
-        animationProgress = 0.0f;
+        animationProgress = 0f;
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Анимация появления
+        // Анимация появления (scale)
         animationProgress = MathHelper.lerp(delta * 0.15f, animationProgress, 1.0f);
-        
-        // Чистый фон без блюра, просто легкое затемнение
-        context.fill(0, 0, this.width, this.height, 0x40000000);
+
+        // Затемнённый фон (без блюра)
+        context.fill(0, 0, width, height, 0xAA000000);
 
         context.getMatrices().push();
-        // Применяем масштаб для всей отрисовки разом
-        context.getMatrices().translate(this.width / 2f, this.height / 2f, 0);
-        context.getMatrices().scale(animationProgress, animationProgress, 1.0f);
-        context.getMatrices().translate(-this.width / 2f, -this.height / 2f, 0);
+        // Центрируем анимацию масштабирования
+        context.getMatrices().translate(width / 2f, height / 2f, 0);
+        context.getMatrices().scale(animationProgress, animationProgress, 1f);
+        context.getMatrices().translate(-width / 2f, -height / 2f, 0);
 
         // Отрисовка всех панелей
         for (Panel panel : panels) {
-            panel.render(context, mouseX, mouseY, this.textRenderer);
+            panel.render(context, mouseX, mouseY, textRenderer);
         }
 
         context.getMatrices().pop();
 
-        // Статус-бар внизу (точно по твоему скрину)
+        // Нижний статус-бар (как в твоём примере, но более чистый)
         renderBottomBar(context);
 
         super.render(context, mouseX, mouseY, delta);
     }
 
     private void renderBottomBar(DrawContext context) {
-        int barY = this.height - 24;
-        context.fill(0, barY, this.width, this.height, 0xAA0A0F1F);
-        
-        // Текст статус-бара
-        context.drawTextWithShadow(this.textRenderer, "Нито игроков", 15, barY + 7, 0xFFFFFFFF);
-        context.drawTextWithShadow(this.textRenderer, "✗", 95, barY + 7, 0xFFFF4444);
-        
-        context.drawTextWithShadow(this.textRenderer, "Nocturn", this.width / 2 - 25, barY + 7, 0xFF00A8FF);
-        
-        context.drawTextWithShadow(this.textRenderer, "Понеты:", this.width - 100, barY + 7, 0xFFFFFFFF);
-        context.drawTextWithShadow(this.textRenderer, "290", this.width - 50, barY + 7, 0xFFFFD700);
+        int barY = height - 26;
+        context.fill(0, barY, width, height, 0xCC0A0A1A);
+        context.fill(0, barY, width, barY + 1, 0xFF2A2A4A);
+
+        String info = "Nocturn | " + MinecraftClient.getInstance().getCurrentServerEntry() != null ?
+                MinecraftClient.getInstance().getCurrentServerEntry().address : "Singleplayer";
+        context.drawTextWithShadow(textRenderer, info, 10, barY + 8, 0xAAAAAA);
+
+        int modulesOn = (int) panels.stream().flatMap(p -> p.modules.stream()).filter(m -> m.active).count();
+        context.drawTextWithShadow(textRenderer, "Modules: " + modulesOn, width - 100, barY + 8, 0xFFFFFF);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         for (Panel panel : panels) {
-            panel.handleMouseClick(mouseX, mouseY, button);
+            if (panel.handleMouseClick(mouseX, mouseY, button, toggleListener)) {
+                return true;
+            }
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean shouldPause() { return false; }
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        for (Panel panel : panels) {
+            if (panel.dragging) {
+                panel.x += (int) deltaX;
+                panel.y += (int) deltaY;
+                // Ограничения, чтобы панель не улетела за экран
+                panel.x = MathHelper.clamp(panel.x, 0, width - panel.width);
+                panel.y = MathHelper.clamp(panel.y, 0, height - 30);
+                return true;
+            }
+        }
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+    }
 
-    // --- ВНУТРЕННЯЯ ЛОГИКА ДВИЖКА МЕНЮ ---
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        for (Panel panel : panels) {
+            panel.dragging = false;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
 
+    @Override
+    public boolean shouldPause() {
+        return false;
+    }
+
+    // ---------- ВНУТРЕННИЙ КЛАСС ПАНЕЛИ ----------
     private static class Panel {
         String title;
         int x, y, width;
-        List<ModuleUI> modules = new ArrayList<>();
+        List<ModuleButton> modules = new ArrayList<>();
         boolean dragging = false;
+        private int scrollOffset = 0;
+        private static final int MODULE_HEIGHT = 18;
+        private static final int HEADER_HEIGHT = 24;
 
         public Panel(String title, int x, int y, int width) {
             this.title = title;
@@ -148,69 +158,125 @@ public class ClickGUI extends Screen {
         }
 
         public void addModule(String name, boolean active) {
-            modules.add(new ModuleUI(name, active));
+            modules.add(new ModuleButton(name, active));
         }
 
         public void render(DrawContext context, int mouseX, int mouseY, net.minecraft.client.font.TextRenderer tr) {
-            // Фон всей панели (темный прозрачный)
-            int height = 32 + (modules.size() * 16);
-            context.fill(x, y, x + width, y + height, 0x9012192B);
-            
-            // Заголовок (шапка)
-            context.fill(x, y, x + width, y + 22, 0xFF18233D);
-            context.fill(x, y + 21, x + width, y + 22, 0xFF00A8FF); // Тонкая полоска внизу шапки
-            
-            context.drawTextWithShadow(tr, title, x + (width / 2) - (tr.getWidth(title) / 2), y + 7, 0xFFFFFFFF);
+            // Максимальная высота панели (ограничим 300px, дальше скролл)
+            int visibleHeight = Math.min(modules.size() * MODULE_HEIGHT + HEADER_HEIGHT, 300);
+            int contentHeight = modules.size() * MODULE_HEIGHT;
+            boolean needsScroll = contentHeight > visibleHeight - HEADER_HEIGHT;
 
-            // Отрисовка модулей внутри
-            int currentY = y + 28;
-            for (ModuleUI mod : modules) {
-                mod.render(context, x, currentY, width, mouseX, mouseY, tr);
-                currentY += 16;
+            // Фон панели
+            context.fill(x, y, x + width, y + visibleHeight, 0xE0101828);
+            // Обводка
+            context.fill(x, y, x + width, y + 1, 0xFF3A3A6A);
+            context.fill(x, y + visibleHeight - 1, x + width, y + visibleHeight, 0xFF3A3A6A);
+
+            // Заголовок (перетаскиваемый)
+            context.fill(x, y, x + width, y + HEADER_HEIGHT, 0xFF1A1F2E);
+            context.fill(x, y + HEADER_HEIGHT - 1, x + width, y + HEADER_HEIGHT, 0xFF5A5A8A);
+            context.drawTextWithShadow(tr, title, x + 8, y + 7, 0xFFFFFF);
+
+            // Область скролла
+            int clipY = y + HEADER_HEIGHT;
+            int clipHeight = visibleHeight - HEADER_HEIGHT;
+            // Отрисовка модулей с учётом скролла
+            int startIdx = scrollOffset / MODULE_HEIGHT;
+            int endIdx = Math.min(modules.size(), startIdx + (clipHeight + MODULE_HEIGHT - 1) / MODULE_HEIGHT);
+
+            for (int i = startIdx; i < endIdx; i++) {
+                ModuleButton mod = modules.get(i);
+                int moduleY = y + HEADER_HEIGHT + (i * MODULE_HEIGHT) - scrollOffset;
+                if (moduleY + MODULE_HEIGHT > y + visibleHeight) continue;
+                if (moduleY + MODULE_HEIGHT < y + HEADER_HEIGHT) continue;
+
+                boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= moduleY && mouseY <= moduleY + MODULE_HEIGHT;
+                // Фон модуля при наведении
+                if (hovered) {
+                    context.fill(x + 1, moduleY, x + width - 1, moduleY + MODULE_HEIGHT, 0x30FFFFFF);
+                }
+
+                // Имя модуля
+                int color = mod.active ? 0xFFFFFFFF : 0xFFAAAAAA;
+                context.drawTextWithShadow(tr, mod.name, x + 8, moduleY + 5, color);
+
+                // Иконка статуса (галочка / крестик)
+                String statusIcon = mod.active ? "✔" : "✖";
+                int iconColor = mod.active ? 0xFF55FF55 : 0xFFFF5555;
+                context.drawTextWithShadow(tr, statusIcon, x + width - 12, moduleY + 5, iconColor);
+            }
+
+            // Полоса прокрутки, если нужно
+            if (needsScroll) {
+                int scrollBarHeight = Math.max(20, (int)((float)clipHeight / contentHeight * clipHeight));
+                int scrollBarY = y + HEADER_HEIGHT + (int)((float)scrollOffset / (contentHeight - clipHeight) * (clipHeight - scrollBarHeight));
+                context.fill(x + width - 4, scrollBarY, x + width - 1, scrollBarY + scrollBarHeight, 0xFF8888AA);
             }
         }
 
-        public void handleMouseClick(double mouseX, double mouseY, int button) {
-            int currentY = y + 28;
-            for (ModuleUI mod : modules) {
-                if (mouseX >= x && mouseX <= x + width && mouseY >= currentY && mouseY <= currentY + 16) {
-                    mod.active = !mod.active; // Переключаем модуль
-                    return;
+        public boolean handleMouseClick(double mouseX, double mouseY, int button, ModuleToggleListener listener) {
+            // Проверка на клик в заголовок для перетаскивания
+            if (mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + HEADER_HEIGHT) {
+                if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                    dragging = true;
+                    return true;
                 }
-                currentY += 16;
             }
+
+            // Клик по модулям
+            int visibleHeight = Math.min(modules.size() * MODULE_HEIGHT + HEADER_HEIGHT, 300);
+            int clipHeight = visibleHeight - HEADER_HEIGHT;
+            int startIdx = scrollOffset / MODULE_HEIGHT;
+
+            for (int i = startIdx; i < modules.size(); i++) {
+                int moduleY = y + HEADER_HEIGHT + (i * MODULE_HEIGHT) - scrollOffset;
+                if (moduleY > y + visibleHeight) break;
+                if (moduleY + MODULE_HEIGHT < y + HEADER_HEIGHT) continue;
+
+                if (mouseX >= x && mouseX <= x + width && mouseY >= moduleY && mouseY <= moduleY + MODULE_HEIGHT) {
+                    ModuleButton mod = modules.get(i);
+                    mod.active = !mod.active;
+                    if (listener != null) {
+                        listener.onToggle(mod.name, mod.active);
+                    }
+                    return true;
+                }
+            }
+
+            // Скролл колесиком обрабатывается в методе mouseScrolled
+            return false;
+        }
+
+        public void scroll(double amount) {
+            int contentHeight = modules.size() * MODULE_HEIGHT;
+            int visibleHeight = Math.min(modules.size() * MODULE_HEIGHT + HEADER_HEIGHT, 300) - HEADER_HEIGHT;
+            if (contentHeight <= visibleHeight) return;
+            scrollOffset = MathHelper.clamp(scrollOffset + (int)(amount * 15), 0, contentHeight - visibleHeight);
         }
     }
 
-    private static class ModuleUI {
+    // ---------- КЛАСС МОДУЛЯ (ТОЛЬКО ДАННЫЕ) ----------
+    private static class ModuleButton {
         String name;
         boolean active;
 
-        public ModuleUI(String name, boolean active) {
+        ModuleButton(String name, boolean active) {
             this.name = name;
             this.active = active;
         }
+    }
 
-        public void render(DrawContext context, int x, int y, int width, int mouseX, int mouseY, net.minecraft.client.font.TextRenderer tr) {
-            boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + 16;
-            
-            // Подсветка при наведении
-            if (hovered) {
-                context.fill(x + 2, y, x + width - 2, y + 15, 0x40FFFFFF);
+    // Обработка скролла внутри GUI
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        for (Panel panel : panels) {
+            if (mouseX >= panel.x && mouseX <= panel.x + panel.width &&
+                mouseY >= panel.y && mouseY <= panel.y + Math.min(panel.modules.size() * 18 + 24, 300)) {
+                panel.scroll(verticalAmount);
+                return true;
             }
-
-            // Имя модуля (белое если активен, серое если выключен — классика HvH)
-            int color = active ? 0xFFFFFFFF : 0xFFA0A0A0;
-            context.drawTextWithShadow(tr, name, x + 8, y + 4, color);
-
-            // Иконка статуса справа
-            String status = active ? "✓" : "...";
-            int sColor = active ? 0xFF00FF88 : 0xFF707070;
-            if (name.equals("Velocity") || name.equals("Trails")) { // Красный крестик как на скрине
-                status = "✗"; sColor = 0xFFFF4444;
-            }
-
-            context.drawTextWithShadow(tr, status, x + width - tr.getWidth(status) - 8, y + 4, sColor);
         }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 }
