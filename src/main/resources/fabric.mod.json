@@ -1,19 +1,24 @@
 {
   "schemaVersion": 1,
-  "id": "funtime-helper",
+  "id": "nocturn-client",
   "version": "1.0.0",
-  "name": "FunTime AutoSell",
-  "description": "Helper for AH",
-  "authors": ["YourNick"],
+  "name": "Nocturn Client",
+  "description": "Next-gen HvH client for Minecraft 1.21.4",
+  "authors": [
+    "morpheus"
+  ],
   "contact": {},
   "license": "MIT",
-  "icon": "assets/funtime-helper/icon.png",
+  "icon": "assets/nocturn/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
-      "net.fabricmc.example.ExampleMod"
+      "net.fabricmc.example.Nocturn"
     ]
   },
+  "mixins": [
+    "nocturn.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.16.9",
     "minecraft": "~1.21.4",
