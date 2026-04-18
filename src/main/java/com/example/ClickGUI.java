@@ -364,7 +364,7 @@ public class ClickGUI extends Screen {
         int searchY = guiY + 12;
         searchFocused = isHover((int) mx, (int) my, searchX, searchY, searchW, 18);
 
-        // Категории
+        // Категори
         int itemH = 30;
         int startY = guiY + headerHeight + 10;
         for (int i = 0; i < categoryList.size(); i++) {
