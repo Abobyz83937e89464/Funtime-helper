@@ -508,4 +508,4 @@ public class ClickGUI extends Screen {
         String icon;
         CategoryEntry(String n, String i) { this.name = n; this.icon = i; }
     }
-    }
+                }
