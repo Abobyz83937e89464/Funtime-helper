@@ -1,13 +1,11 @@
 {
-	"required": true,
-	"minVersion": "0.8",
-	"package": "net.fabricmc.example.mixin",
-	"compatibilityLevel": "JAVA_21",
-	"mixins": [
-	],
-	"client": [
-	],
-	"injectors": {
-		"defaultRequire": 1
-	}
+  "required": true,
+  "package": "com.example.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "KeyInputMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }
