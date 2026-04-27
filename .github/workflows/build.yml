@@ -1,10 +1,10 @@
-name: Build Nocturn Client
+name: Build Minecraft Client
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "26.1.2" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "26.1.2" ]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -12,9 +12,8 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up JDK 21
@@ -22,7 +21,6 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'gradle'
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -30,9 +28,12 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build
 
-      - name: Upload Build Artifact
+      - name: List files (для отладки)
+        run: ls -R build/libs/
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Nocturn-Client-Jar
-          path: build/libs/
+          name: Nocturn-Client
+          path: build/libs/*.jar
           if-no-files-found: error
