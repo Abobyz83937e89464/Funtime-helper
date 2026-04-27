@@ -1,36 +1,32 @@
 package com.example;
 
-import com.example.ui.ClickGUI;
-import net.fabricmc.api.ClientModInitializer;
+import com.example.ui.newmenu.Menu; // Теперь импортируем новое меню
+import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import org.lwjgl.glfw.GLFW;
 
-public class NocturnClient implements ClientModInitializer {
-    
-    // Создаем бинд на Правый Shift
-    private static KeyBinding clickGuiKey;
+public class NocturnClient implements ModInitializer {
+
+    private static KeyBinding guiKeyBind;
 
     @Override
-    public void onInitializeClient() {
-        // Регистрируем кнопку
-        clickGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "Open ClickGUI", // Название в настройках
+    public void onInitialize() {
+        // Регистрируем кнопку открытия меню (Правый Шифт)
+        guiKeyBind = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "Open Menu",
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_RIGHT_SHIFT, // Кнопка по умолчанию
-                "Nocturn Client" // Категория в настройках
+                GLFW.GLFW_KEY_RIGHT_SHIFT,
+                "Nocturn Client"
         ));
 
-        // Проверяем нажатие каждый тик игры
+        // Слушаем нажатия в каждом тике клиента
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (clickGuiKey.wasPressed()) {
-                // Если мы в игре и меню не открыто — открываем наше ClickGUI
-                if (client.currentScreen == null) {
-                    client.setScreen(new ClickGUI());
-                }
+            while (guiKeyBind.wasPressed()) {
+                // Вызываем наше новое меню
+                client.setScreen(new Menu());
             }
         });
     }
