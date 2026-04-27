@@ -1,27 +1,23 @@
-name: Build Mod 1.21.4
+name: Build Minecraft Client
+
 on: [push, pull_request]
+
+env:
+  # Вот эта строчка уберет предупреждение и заставит всё работать на Node 24
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup JDK 21
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '21' # Или какая у тебя версия для Fabric 1.21.4
           distribution: 'temurin'
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
 
       - name: Build with Gradle
         run: ./gradlew build
-
-      - name: Upload JAR
-        uses: actions/upload-artifact@v4
-        with:
-          name: FunTimeHelper-JAR
-          path: build/libs/*.jar
-          if-no-files-found: error
