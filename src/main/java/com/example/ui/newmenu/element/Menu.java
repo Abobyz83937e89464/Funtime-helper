@@ -14,10 +14,10 @@ public class Menu extends Screen {
     private final CategoryElement categoryElement;
     private float scrollOffset = 0;
 
-    private static final int MENU_WIDTH = 550;
-    private static final int MENU_HEIGHT = 270;
-    private static final int HEADER_HEIGHT = 40;
-    private static final int FOOTER_HEIGHT = 40;
+    private static final int MENU_WIDTH = 320;
+    private static final int MENU_HEIGHT = 180;
+    private static final int HEADER_HEIGHT = 20;
+    private static final int FOOTER_HEIGHT = 22;
 
     public Menu() {
         super(Text.of("Nocturn Client"));
@@ -53,11 +53,11 @@ public class Menu extends Screen {
                 new Color(29, 31, 44, 204));
         renderFooter(context, x, y + MENU_HEIGHT, MENU_WIDTH, FOOTER_HEIGHT);
 
-        // === OUTLINE вокруг всего ===
+        // === OUTLINE ===
         DrawHelper.drawOutline(context,
-                x - 2, y - HEADER_HEIGHT - 2,
-                MENU_WIDTH + 4, HEADER_HEIGHT + MENU_HEIGHT + FOOTER_HEIGHT + 4,
-                0, new Color(52, 51, 64), 2);
+                x - 1, y - HEADER_HEIGHT - 1,
+                MENU_WIDTH + 2, HEADER_HEIGHT + MENU_HEIGHT + FOOTER_HEIGHT + 2,
+                0, new Color(52, 51, 64), 1);
 
         // === КОНТЕНТ ===
         renderContent(context, x, y, MENU_WIDTH, MENU_HEIGHT);
@@ -67,12 +67,12 @@ public class Menu extends Screen {
         TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
 
         String title = "Nocturn Client";
-        int titleX = x + 12;
+        int titleX = x + 6;
         int titleY = y + (height - 8) / 2;
         context.drawText(textRenderer, title, titleX, titleY, new Color(197, 200, 255).getRGB(), false);
 
         String version = "v1.0.0";
-        int versionX = x + width - textRenderer.getWidth(version) - 12;
+        int versionX = x + width - textRenderer.getWidth(version) - 6;
         context.drawText(textRenderer, version, versionX, titleY, new Color(141, 144, 199).getRGB(), false);
     }
 
@@ -83,37 +83,31 @@ public class Menu extends Screen {
     private void renderContent(DrawContext context, int x, int y, int width, int height) {
         TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
 
-        int padding = 8;
+        int padding = 4;
         int columns = 4;
         int cardWidth = (width - padding * (columns + 1)) / columns;
-        int cardHeight = 50;
-        int rows = 3;
-
-        String categoryName = categoryElement.getSelectedCategory().getDisplayName();
+        int cardHeight = 35;
+        int rows = 4;
 
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
                 int cardX = x + padding + col * (cardWidth + padding);
                 int cardY = y + padding + row * (cardHeight + padding) + (int) scrollOffset;
 
-                // Проверка видимости
                 if (cardY + cardHeight < y || cardY > y + height) continue;
 
-                // Карточка модуля
                 DrawHelper.drawRect(context, cardX, cardY, cardWidth, cardHeight, 3,
                         new Color(28, 29, 38));
                 DrawHelper.drawOutline(context, cardX - 1, cardY - 1,
                         cardWidth + 2, cardHeight + 2, 3,
                         new Color(33, 32, 43), 1);
 
-                // Заглушка текста
-                String moduleName = categoryName + " " + (row * columns + col + 1);
-                context.drawText(textRenderer, moduleName, cardX + 8, cardY + 6,
+                String moduleName = "Module";
+                context.drawText(textRenderer, moduleName, cardX + 4, cardY + 4,
                         new Color(127, 133, 172).getRGB(), false);
 
-                // Индикатор "Enabled"
                 String enabled = "OFF";
-                context.drawText(textRenderer, enabled, cardX + 8, cardY + 20,
+                context.drawText(textRenderer, enabled, cardX + 4, cardY + 16,
                         new Color(80, 84, 120).getRGB(), false);
             }
         }
@@ -124,7 +118,6 @@ public class Menu extends Screen {
         int x = getMenuX();
         int y = getMenuY();
 
-        // Footer клик
         if (mouseY >= y + MENU_HEIGHT && mouseY <= y + MENU_HEIGHT + FOOTER_HEIGHT) {
             if (categoryElement.mouseClicked(mouseX, mouseY)) {
                 scrollOffset = 0;
@@ -142,9 +135,9 @@ public class Menu extends Screen {
 
         if (mouseX >= x && mouseX <= x + MENU_WIDTH &&
             mouseY >= y && mouseY <= y + MENU_HEIGHT) {
-            scrollOffset += (float) (verticalAmount * 15);
+            scrollOffset += (float) (verticalAmount * 10);
             if (scrollOffset > 0) scrollOffset = 0;
-            float maxScroll = Math.max(0, 3 * 58 - MENU_HEIGHT + 16);
+            float maxScroll = Math.max(0, 4 * 39 - MENU_HEIGHT + 8);
             if (scrollOffset < -maxScroll) scrollOffset = -maxScroll;
             return true;
         }
