@@ -2,12 +2,11 @@ name: Build Nocturn Client
 
 on:
   push:
-    branches: [ "main", "master" ] # Сборка запускается при пуше в эти ветки
+    branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
 
 env:
-  # Принудительно используем Node 24, чтобы не было варнингов и ошибок
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -15,11 +14,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Загружаем код из репозитория
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Устанавливаем Java (для 1.21.4 нужна 21-я версия)
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -27,20 +24,15 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      # 3. Даем права на запуск Gradle (чтобы не было Permission Denied)
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 4. Запускаем сборку мода
       - name: Build with Gradle
         run: ./gradlew build
 
-      # 5. Сохраняем готовый файл (Артефакт)
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Nocturn-Client-Jar
-          # Путь к скомпилированному файлу. 
-          # Мы берем только тот, который не содержит "-sources" или "-dev"
-          path: build/libs/*[!sources|dev].jar
+          path: build/libs/
           if-no-files-found: error
