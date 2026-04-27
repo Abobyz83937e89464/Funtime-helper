@@ -1,33 +1,20 @@
 package com.example;
 
-import com.example.ui.newmenu.Menu; // Теперь импортируем новое меню
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import org.lwjgl.glfw.GLFW;
+import net.fabricmc.api.ClientModInitializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class NocturnClient implements ModInitializer {
-
-    private static KeyBinding guiKeyBind;
+public class NocturnClient implements ClientModInitializer {
+    
+    public static final String MOD_ID = "nocturn-client";
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     @Override
-    public void onInitialize() {
-        // Регистрируем кнопку открытия меню (Правый Шифт)
-        guiKeyBind = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "Open Menu",
-                InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_RIGHT_SHIFT,
-                "Nocturn Client"
-        ));
-
-        // Слушаем нажатия в каждом тике клиента
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (guiKeyBind.wasPressed()) {
-                // Вызываем наше новое меню
-                client.setScreen(new Menu());
-            }
-        });
+    public void onInitializeClient() {
+        // Этот код выполнится при запуске Майнкрафта
+        LOGGER.info("Nocturn Client успешно запущен!");
+        
+        // Позже здесь мы добавим регистрацию кнопки (например, Right Shift), 
+        // чтобы по ней открывалось твоё меню.
     }
 }
