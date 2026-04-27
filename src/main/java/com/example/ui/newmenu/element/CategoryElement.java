@@ -53,7 +53,7 @@ public class CategoryElement {
         TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
         Category[] categories = Category.values();
 
-        int spacing = 30;
+        int spacing = 8;
         int totalWidth = 0;
         for (Category cat : categories) {
             totalWidth += textRenderer.getWidth(cat.getDisplayName());
@@ -73,15 +73,15 @@ public class CategoryElement {
 
             if (isSelected) {
                 DrawHelper.drawRect(context,
-                        currentX - 6, textY - 5,
-                        nameWidth + 12, 18, 5,
+                        currentX - 3, textY - 2,
+                        nameWidth + 6, 12, 3,
                         new Color(0, 0, 0, 180));
             }
 
             Color color = isSelected ? new Color(197, 200, 255) : new Color(141, 144, 199);
             context.drawText(textRenderer, name, (int) currentX, (int) textY, color.getRGB(), false);
 
-            categoryBounds.put(category, new float[]{currentX - 6, textY - 5, nameWidth + 12, 18});
+            categoryBounds.put(category, new float[]{currentX - 3, textY - 2, nameWidth + 6, 12});
             currentX += nameWidth + spacing;
         }
     }
