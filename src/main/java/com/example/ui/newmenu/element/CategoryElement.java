@@ -1,5 +1,6 @@
 package com.example.ui.newmenu.element;
 
+import com.example.util.render.DrawHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -48,18 +49,18 @@ public class CategoryElement {
         return false;
     }
 
-    public void renderFooter(DrawContext context, int x, int y, int footerHeight) {
+    public void renderFooter(DrawContext context, int x, int y, int footerWidth, int footerHeight) {
         TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
         Category[] categories = Category.values();
 
+        int spacing = 30;
         int totalWidth = 0;
-        int spacing = 40;
         for (Category cat : categories) {
             totalWidth += textRenderer.getWidth(cat.getDisplayName());
         }
         totalWidth += spacing * (categories.length - 1);
 
-        float currentX = x + (1100 - totalWidth) / 2f;
+        float currentX = x + (footerWidth - totalWidth) / 2f;
         float textY = y + (footerHeight - 8) / 2f;
 
         categoryBounds.clear();
@@ -69,20 +70,18 @@ public class CategoryElement {
             int nameWidth = textRenderer.getWidth(name);
 
             boolean isSelected = (category == selectedCategory);
-            Color color = isSelected ? new Color(197, 200, 255) : new Color(141, 144, 199);
 
-            // Подсветка выбранной категории
             if (isSelected) {
-                com.example.util.render.DrawHelper.drawRect(context,
-                        currentX - 6, textY - 4,
-                        nameWidth + 12, 16, 5,
+                DrawHelper.drawRect(context,
+                        currentX - 6, textY - 5,
+                        nameWidth + 12, 18, 5,
                         new Color(0, 0, 0, 180));
             }
 
+            Color color = isSelected ? new Color(197, 200, 255) : new Color(141, 144, 199);
             context.drawText(textRenderer, name, (int) currentX, (int) textY, color.getRGB(), false);
 
-            categoryBounds.put(category, new float[]{currentX - 6, textY - 4, nameWidth + 12, 16});
-
+            categoryBounds.put(category, new float[]{currentX - 6, textY - 5, nameWidth + 12, 18});
             currentX += nameWidth + spacing;
         }
     }
