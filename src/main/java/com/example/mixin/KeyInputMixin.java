@@ -16,10 +16,12 @@ public class KeyInputMixin {
     private void onKey(long window, int key, int scancode, int action, int modifiers, CallbackInfo ci) {
         if (action == GLFW.GLFW_PRESS && key == GLFW.GLFW_KEY_RIGHT_SHIFT) {
             MinecraftClient mc = MinecraftClient.getInstance();
+
+            // ✅ вот этот кусок заменён
             if (mc.currentScreen == null) {
-                mc.send(() -> mc.setScreen(new Menu()));
+                mc.setScreen(new Menu());
             } else if (mc.currentScreen instanceof Menu) {
-                mc.send(() -> mc.setScreen(null));
+                mc.setScreen(null);
             }
         }
     }
