@@ -1,5 +1,8 @@
-package com.example.ui.newmenu.element;
+package com.example.ui.menu;
 
+import com.example.ui.menu.element.CategoryElement;
+import com.example.ui.menu.element.CategoryElement.Category;
+import com.example.ui.menu.element.ModuleElement;
 import com.example.util.render.DrawHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
@@ -8,341 +11,364 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 
 import java.awt.Color;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class Menu extends Screen {
 
-    private final CategoryElement categoryElement;
-    private float scrollOffset = 0;
-    private float maxScroll = 0;
+    // ─── Компоненты ──────────────────────────────────────────────────────────
 
-    // Размеры меню (пиксели на экране)
-    private static final int MENU_WIDTH = 480;
-    private static final int MENU_HEIGHT = 260;
-    private static final int HEADER_HEIGHT = 36;
-    private static final int FOOTER_HEIGHT = 36;
+    private final CategoryElement categoryElement = new CategoryElement();
+    private final ModuleElement   moduleElement   = new ModuleElement();
 
-    // Карточки модулей
-    private static final int COLUMNS = 4;
-    private static final int CARD_PADDING = 6;
-    private static final int CARD_HEIGHT = 52;
+    // ─── Размеры меню (в пикселях GUI-scale) ─────────────────────────────────
 
-    // Заглушки модулей для каждой категории
-    private final List<ModuleEntry> currentModules = new ArrayList<>();
+    private static final int MENU_W     = 1100;
+    private static final int MENU_H     = 540;
+    private static final int HEADER_H   = 80;
+    private static final int FOOTER_H   = 80;
+
+    // ─── Колонки ─────────────────────────────────────────────────────────────
+
+    private static final int COLUMNS     = 4;
+
+    // ─── Скролл ──────────────────────────────────────────────────────────────
+
+    private float scrollOffset  = 0f;
+    private float maxScroll     = 0f;
+    private float scrollVelocity = 0f; // инерция
+
+    // ─── Модули ──────────────────────────────────────────────────────────────
+
+    private final Map<Category, List<ModuleEntry>> modulesByCategory = new LinkedHashMap<>();
+    private List<ModuleEntry> currentModules = new ArrayList<>();
+
+    // ─── Конструктор ─────────────────────────────────────────────────────────
 
     public Menu() {
         super(Text.of("Nocturn Client"));
-        this.categoryElement = new CategoryElement();
-        loadModulesForCategory();
+        initModules();
+        updateCurrentModules();
     }
 
-    private void loadModulesForCategory() {
-        currentModules.clear();
-        String cat = categoryElement.getSelectedCategory().getDisplayName();
+    private void initModules() {
+        modulesByCategory.put(Category.COMBAT, Arrays.asList(
+                new ModuleEntry("KillAura"),
+                new ModuleEntry("Velocity"),
+                new ModuleEntry("AutoTotem"),
+                new ModuleEntry("Criticals"),
+                new ModuleEntry("Reach"),
+                new ModuleEntry("AimAssist"),
+                new ModuleEntry("AutoPot"),
+                new ModuleEntry("AntiBot"),
+                new ModuleEntry("WTap"),
+                new ModuleEntry("Backtrack")
+        ));
+        modulesByCategory.put(Category.MOVEMENT, Arrays.asList(
+                new ModuleEntry("Speed"),
+                new ModuleEntry("Fly"),
+                new ModuleEntry("Sprint"),
+                new ModuleEntry("NoSlow"),
+                new ModuleEntry("Step"),
+                new ModuleEntry("Strafe"),
+                new ModuleEntry("LongJump"),
+                new ModuleEntry("Parkour")
+        ));
+        modulesByCategory.put(Category.RENDER, Arrays.asList(
+                new ModuleEntry("ESP"),
+                new ModuleEntry("Tracers"),
+                new ModuleEntry("NameTags"),
+                new ModuleEntry("Fullbright"),
+                new ModuleEntry("NoRender"),
+                new ModuleEntry("Chams"),
+                new ModuleEntry("HUD")
+        ));
+        modulesByCategory.put(Category.PLAYER, Arrays.asList(
+                new ModuleEntry("AutoArmor"),
+                new ModuleEntry("ChestStealer"),
+                new ModuleEntry("FastPlace"),
+                new ModuleEntry("NoFall"),
+                new ModuleEntry("AntiAFK"),
+                new ModuleEntry("Scaffold")
+        ));
+        modulesByCategory.put(Category.WORLD, Arrays.asList(
+                new ModuleEntry("Timer"),
+                new ModuleEntry("Nuker"),
+                new ModuleEntry("Phase"),
+                new ModuleEntry("Jesus"),
+                new ModuleEntry("AutoMine")
+        ));
+        modulesByCategory.put(Category.MISC, Arrays.asList(
+                new ModuleEntry("AutoFish"),
+                new ModuleEntry("Disabler"),
+                new ModuleEntry("Spammer"),
+                new ModuleEntry("ChatFilter"),
+                new ModuleEntry("AntiCheat")
+        ));
+    }
 
-        // Заглушки — потом заменишь на реальные модули
-        switch (categoryElement.getSelectedCategory()) {
-            case COMBAT -> {
-                currentModules.add(new ModuleEntry("KillAura", false));
-                currentModules.add(new ModuleEntry("Velocity", false));
-                currentModules.add(new ModuleEntry("AutoTotem", true));
-                currentModules.add(new ModuleEntry("Criticals", false));
-                currentModules.add(new ModuleEntry("Reach", false));
-                currentModules.add(new ModuleEntry("AimAssist", false));
-                currentModules.add(new ModuleEntry("AutoPot", false));
-                currentModules.add(new ModuleEntry("AntiBot", true));
-            }
-            case MOVEMENT -> {
-                currentModules.add(new ModuleEntry("Speed", false));
-                currentModules.add(new ModuleEntry("Fly", false));
-                currentModules.add(new ModuleEntry("Sprint", true));
-                currentModules.add(new ModuleEntry("NoSlow", false));
-                currentModules.add(new ModuleEntry("Step", false));
-                currentModules.add(new ModuleEntry("Strafe", false));
-            }
-            case RENDER -> {
-                currentModules.add(new ModuleEntry("ESP", false));
-                currentModules.add(new ModuleEntry("Tracers", false));
-                currentModules.add(new ModuleEntry("NameTags", true));
-                currentModules.add(new ModuleEntry("Fullbright", true));
-                currentModules.add(new ModuleEntry("NoRender", false));
-            }
-            case PLAYER -> {
-                currentModules.add(new ModuleEntry("AutoArmor", false));
-                currentModules.add(new ModuleEntry("ChestStealer", false));
-                currentModules.add(new ModuleEntry("FastPlace", true));
-                currentModules.add(new ModuleEntry("NoFall", false));
-            }
-            case WORLD -> {
-                currentModules.add(new ModuleEntry("Scaffold", false));
-                currentModules.add(new ModuleEntry("Timer", false));
-                currentModules.add(new ModuleEntry("Nuker", false));
-            }
-            case MISC -> {
-                currentModules.add(new ModuleEntry("AutoFish", false));
-                currentModules.add(new ModuleEntry("Disabler", false));
-                currentModules.add(new ModuleEntry("AntiCheat", false));
-                currentModules.add(new ModuleEntry("Spammer", false));
-            }
-        }
-        scrollOffset = 0;
+    private void updateCurrentModules() {
+        currentModules = modulesByCategory.getOrDefault(categoryElement.getSelectedCategory(), Collections.emptyList());
+        scrollOffset = 0f;
+        scrollVelocity = 0f;
+        updateMaxScroll();
+    }
+
+    // ─── Позиция меню (GUI-координаты) ────────────────────────────────────────
+
+    private int menuX() {
+        return (mc.getWindow().getScaledWidth()  - MENU_W) / 2;
+    }
+
+    private int menuY() {
+        return (mc.getWindow().getScaledHeight() - MENU_H) / 2;
+    }
+
+    // ─── Тик ─────────────────────────────────────────────────────────────────
+
+    @Override
+    public void tick() {
+        super.tick();
+        // Инерция скролла
+        scrollVelocity *= 0.85f;
+        scrollOffset += scrollVelocity;
+        clampScroll();
         updateMaxScroll();
     }
 
     private void updateMaxScroll() {
-        int rows = (int) Math.ceil((double) currentModules.size() / COLUMNS);
-        int contentHeight = rows * (CARD_HEIGHT + CARD_PADDING) + CARD_PADDING;
-        maxScroll = Math.max(0, contentHeight - MENU_HEIGHT + 16);
+        int cardH = moduleElement.getHeight();
+        int rows  = (int) Math.ceil((double) currentModules.size() / COLUMNS);
+        int contentH = rows * (cardH + ModuleElement.CARD_PADDING) - ModuleElement.CARD_PADDING;
+        int viewportH = MENU_H - 32;
+        maxScroll = Math.max(0, contentH - viewportH);
     }
 
-    private int getMenuX() {
-        return (MinecraftClient.getInstance().getWindow().getScaledWidth() - MENU_WIDTH) / 2;
+    private void clampScroll() {
+        if (scrollOffset < -maxScroll) scrollOffset = -maxScroll;
+        if (scrollOffset > 0)          scrollOffset = 0;
     }
 
-    private int getMenuY() {
-        return (MinecraftClient.getInstance().getWindow().getScaledHeight() - MENU_HEIGHT) / 2;
-    }
+    // ─── Render ──────────────────────────────────────────────────────────────
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        int x = getMenuX();
-        int y = getMenuY();
+        int x = menuX();
+        int y = menuY();
+        TextRenderer tr = mc.textRenderer;
 
-        // === Затемнение всего экрана ===
+        // === Затемнение фона ===
         DrawHelper.drawRect(context, 0, 0,
-                MinecraftClient.getInstance().getWindow().getScaledWidth(),
-                MinecraftClient.getInstance().getWindow().getScaledHeight(),
-                new Color(0, 0, 0, 120));
+                mc.getWindow().getScaledWidth(),
+                mc.getWindow().getScaledHeight(),
+                new Color(0, 0, 0, 100));
 
-        // === Тень вокруг меню ===
-        DrawHelper.drawShadow(context, x, y - HEADER_HEIGHT, MENU_WIDTH, HEADER_HEIGHT + MENU_HEIGHT + FOOTER_HEIGHT, 6);
+        // === Тень ===
+        DrawHelper.drawShadow(context, x - 2, y - HEADER_H - 2,
+                MENU_W + 4, HEADER_H + MENU_H + FOOTER_H + 4, 8);
+
+        // === Outline вокруг всего ===
+        DrawHelper.drawOutlineRect(context,
+                x - 2, y - HEADER_H - 2,
+                MENU_W + 4, HEADER_H + MENU_H + FOOTER_H + 4,
+                new Color(52, 51, 64), 2);
 
         // === HEADER ===
-        DrawHelper.drawRect(context, x, y - HEADER_HEIGHT, MENU_WIDTH, HEADER_HEIGHT,
-                new Color(29, 31, 44));
-        // Линия-разделитель под header
-        DrawHelper.drawRect(context, x, y - 1, MENU_WIDTH, 1,
-                new Color(52, 51, 64));
-        renderHeader(context, x, y - HEADER_HEIGHT, MENU_WIDTH, HEADER_HEIGHT);
-
-        // === MAIN BACKGROUND ===
-        DrawHelper.drawRect(context, x, y, MENU_WIDTH, MENU_HEIGHT,
-                new Color(17, 19, 24));
-
-        // === CONTENT (модули в сетке) ===
-        renderContent(context, x, y, MENU_WIDTH, MENU_HEIGHT, mouseX, mouseY);
-
-        // === Линия-разделитель над footer ===
-        DrawHelper.drawRect(context, x, y + MENU_HEIGHT, MENU_WIDTH, 1,
-                new Color(52, 51, 64));
+        DrawHelper.drawRect(context, x, y - HEADER_H, MENU_W, HEADER_H, new Color(29, 31, 44, 204));
+        renderHeader(context, x, y - HEADER_H, MENU_W, HEADER_H, tr);
 
         // === FOOTER ===
-        DrawHelper.drawRect(context, x, y + MENU_HEIGHT + 1, MENU_WIDTH, FOOTER_HEIGHT - 1,
-                new Color(29, 31, 44));
-        categoryElement.render(context, x, y + MENU_HEIGHT + 1, MENU_WIDTH, FOOTER_HEIGHT - 1);
+        DrawHelper.drawRect(context, x, y + MENU_H, MENU_W, FOOTER_H, new Color(29, 31, 44, 204));
+        renderFooter(context, x, y + MENU_H, MENU_W, FOOTER_H, tr);
+        categoryElement.render(context, x, y + MENU_H, MENU_W, FOOTER_H);
 
-        // === OUTLINE вокруг всего ===
-        DrawHelper.drawOutlineRect(context,
-                x - 1, y - HEADER_HEIGHT - 1,
-                MENU_WIDTH + 2, HEADER_HEIGHT + MENU_HEIGHT + FOOTER_HEIGHT + 2,
-                new Color(52, 51, 64), 1);
-    }
+        // === MAIN BACKGROUND ===
+        DrawHelper.drawRect(context, x, y, MENU_W, MENU_H, new Color(17, 19, 24));
 
-    private void renderHeader(DrawContext context, int x, int y, int width, int height) {
-        TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+        // Горизонтальные разделители
+        DrawHelper.drawRect(context, x, y - 1,      MENU_W, 1, new Color(45, 44, 58));
+        DrawHelper.drawRect(context, x, y + MENU_H, MENU_W, 1, new Color(45, 44, 58));
 
-        // Название клиента
-        String title = "Nocturn Client";
-        int titleX = x + 10;
-        int titleY = y + (height - 8) / 2;
-
-        // Фоновая подсветка текста названия
-        int titleWidth = textRenderer.getWidth(title);
-        DrawHelper.drawRect(context, titleX - 4, titleY - 3, titleWidth + 8, 14,
-                new Color(51, 56, 94, 80));
-
-        context.drawText(textRenderer, title, titleX, titleY, new Color(197, 200, 255).getRGB(), false);
-
-        // Версия справа
-        String version = "v1.0.0";
-        int versionX = x + width - textRenderer.getWidth(version) - 10;
-        context.drawText(textRenderer, version, versionX, titleY, new Color(100, 104, 150).getRGB(), false);
-
-        // Категория по центру
-        String categoryName = categoryElement.getSelectedCategory().getDisplayName();
-        int catWidth = textRenderer.getWidth(categoryName);
-        int catX = x + (width - catWidth) / 2;
-        context.drawText(textRenderer, categoryName, catX, titleY, new Color(141, 144, 199).getRGB(), false);
-    }
-
-    private void renderContent(DrawContext context, int x, int y, int width, int height, int mouseX, int mouseY) {
-        TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-
-        int cardWidth = (width - CARD_PADDING * (COLUMNS + 1)) / COLUMNS;
-
-        // Включаем scissor чтобы контент не выходил за пределы
-        context.enableScissor(x, y, x + width, y + height);
-
-        int startY = y + CARD_PADDING + (int) scrollOffset;
-
-        for (int i = 0; i < currentModules.size(); i++) {
-            ModuleEntry module = currentModules.get(i);
-
-            int col = i % COLUMNS;
-            int row = i / COLUMNS;
-
-            int cardX = x + CARD_PADDING + col * (cardWidth + CARD_PADDING);
-            int cardY = startY + row * (CARD_HEIGHT + CARD_PADDING);
-
-            // Пропускаем невидимые карточки
-            if (cardY + CARD_HEIGHT < y || cardY > y + height) continue;
-
-            boolean hovered = mouseX >= cardX && mouseX <= cardX + cardWidth &&
-                              mouseY >= cardY && mouseY <= cardY + CARD_HEIGHT &&
-                              mouseY >= y && mouseY <= y + height;
-
-            // === Карточка модуля ===
-            Color cardBg = hovered ? new Color(33, 35, 48) : new Color(28, 29, 38);
-            DrawHelper.drawRect(context, cardX, cardY, cardWidth, CARD_HEIGHT, cardBg);
-
-            // Outline карточки
-            Color outlineColor = module.enabled ? new Color(75, 80, 140) : new Color(38, 39, 52);
-            DrawHelper.drawOutlineRect(context, cardX, cardY, cardWidth, CARD_HEIGHT, outlineColor, 1);
-
-            // Акцентная полоска сверху если включён
-            if (module.enabled) {
-                DrawHelper.drawRect(context, cardX + 1, cardY + 1, cardWidth - 2, 2,
-                        new Color(125, 136, 255));
-            }
-
-            // Название модуля
-            int textY = cardY + 8;
-            Color nameColor = module.enabled ? new Color(197, 200, 255) : new Color(127, 133, 172);
-            context.drawText(textRenderer, module.name, cardX + 8, textY, nameColor.getRGB(), false);
-
-            // Статус ON/OFF
-            String status = module.enabled ? "ON" : "OFF";
-            Color statusColor = module.enabled ? new Color(100, 220, 100) : new Color(80, 84, 120);
-            context.drawText(textRenderer, status, cardX + 8, textY + 14, statusColor.getRGB(), false);
-
-            // Индикатор справа
-            int indicatorSize = 8;
-            int indicatorX = cardX + cardWidth - indicatorSize - 8;
-            int indicatorY = cardY + (CARD_HEIGHT - indicatorSize) / 2;
-            Color indicatorColor = module.enabled ? new Color(125, 136, 255) : new Color(45, 47, 60);
-            DrawHelper.drawRect(context, indicatorX, indicatorY, indicatorSize, indicatorSize, indicatorColor);
-            DrawHelper.drawOutlineRect(context, indicatorX, indicatorY, indicatorSize, indicatorSize,
-                    new Color(60, 62, 80), 1);
-
-            // Бинд (заглушка)
-            String bind = "[NONE]";
-            int bindWidth = textRenderer.getWidth(bind);
-            context.drawText(textRenderer, bind, cardX + cardWidth - bindWidth - 8, textY + 14 + 12,
-                    new Color(60, 63, 90).getRGB(), false);
-        }
-
+        // === CONTENT ===
+        context.enableScissor(x, y, x + MENU_W, y + MENU_H);
+        renderModules(context, x + 16, y + 16, mouseX, mouseY);
         context.disableScissor();
 
-        // Полоса прокрутки
-        if (maxScroll > 0) {
-            int scrollBarHeight = Math.max(20, (int) ((float) height / (height + maxScroll) * height));
-            float scrollProgress = -scrollOffset / maxScroll;
-            int scrollBarY = y + (int) (scrollProgress * (height - scrollBarHeight));
-            int scrollBarX = x + width - 3;
+        // === Scroll bar ===
+        renderScrollBar(context, x + MENU_W - 4, y, 3, MENU_H);
 
-            DrawHelper.drawRect(context, scrollBarX, y, 2, height, new Color(25, 26, 35));
-            DrawHelper.drawRect(context, scrollBarX, scrollBarY, 2, scrollBarHeight, new Color(75, 80, 140));
+        super.render(context, mouseX, mouseY, delta);
+    }
+
+    private void renderHeader(DrawContext context, int x, int y, int w, int h, TextRenderer tr) {
+        // Клиентское имя
+        String title = "Nocturn Client";
+        int titleX = x + 16;
+        int titleY = y + (h - tr.fontHeight) / 2;
+
+        // Подсветка под заголовком
+        int tw = tr.getWidth(title);
+        DrawHelper.drawGradientRectH(context, titleX - 2, titleY - 2, tw + 24, tr.fontHeight + 4,
+                new Color(51, 56, 94, 100), new Color(51, 56, 94, 0));
+
+        // Акцентная полоска слева
+        DrawHelper.drawAccentBar(context, titleX - 6, titleY - 2, 3, tr.fontHeight + 4);
+
+        context.drawText(tr, title, titleX, titleY, new Color(197, 200, 255).getRGB(), false);
+
+        // Версия и счётчик модулей справа
+        String info = "v1.0  |  Modules: " + currentModules.size();
+        context.drawText(tr, info,
+                x + w - tr.getWidth(info) - 16,
+                titleY, new Color(80, 84, 110).getRGB(), false);
+    }
+
+    private void renderFooter(DrawContext context, int x, int y, int w, int h, TextRenderer tr) {
+        // Ник игрока слева
+        String nick = mc.getSession().getUsername();
+        context.drawText(tr, nick, x + 16, y + (h - tr.fontHeight) / 2,
+                new Color(100, 104, 150).getRGB(), false);
+    }
+
+    private void renderModules(DrawContext context, int startX, int startY, int mouseX, int mouseY) {
+        int cardH   = moduleElement.getHeight();
+        int cardW   = ModuleElement.CARD_WIDTH;
+        int padding = ModuleElement.CARD_PADDING;
+
+        int[] colX = new int[COLUMNS];
+        for (int i = 0; i < COLUMNS; i++) {
+            colX[i] = startX + i * (cardW + padding);
+        }
+
+        int[] colY = new int[COLUMNS];
+        Arrays.fill(colY, startY);
+
+        int col = 0;
+        for (ModuleEntry module : currentModules) {
+            int cx = colX[col];
+            int cy = colY[col] + (int) scrollOffset;
+
+            moduleElement.render(context, cx, cy, module);
+
+            colY[col] += cardH + padding;
+            col = (col + 1) % COLUMNS;
         }
     }
+
+    private void renderScrollBar(DrawContext context, int x, int y, int w, int h) {
+        if (maxScroll <= 0) return;
+
+        DrawHelper.drawRect(context, x, y, w, h, new Color(22, 23, 30));
+
+        float ratio     = (float) h / (h + maxScroll);
+        int barH        = Math.max(20, (int)(ratio * h));
+        float progress  = (-scrollOffset) / maxScroll;
+        int barY        = y + (int)(progress * (h - barH));
+
+        DrawHelper.drawRect(context, x, barY, w, barH, new Color(75, 80, 140));
+    }
+
+    // ─── Mouse & Key ─────────────────────────────────────────────────────────
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int x = getMenuX();
-        int y = getMenuY();
+        int x = menuX();
+        int y = menuY();
 
-        // Клик по footer — категории
-        if (mouseY >= y + MENU_HEIGHT + 1 && mouseY <= y + MENU_HEIGHT + FOOTER_HEIGHT) {
+        // Клик по футеру (категории)
+        if (mouseY >= y + MENU_H && mouseY <= y + MENU_H + FOOTER_H) {
             if (categoryElement.mouseClicked(mouseX, mouseY)) {
-                loadModulesForCategory();
+                updateCurrentModules();
                 return true;
             }
         }
 
-        // Клик по карточкам модулей
-        if (mouseY >= y && mouseY <= y + MENU_HEIGHT) {
-            if (handleModuleClick(mouseX, mouseY, button)) {
-                return true;
-            }
+        // Клик по модулям
+        if (mouseY >= y && mouseY <= y + MENU_H) {
+            if (handleModuleClick(mouseX, mouseY, button)) return true;
         }
 
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private boolean handleModuleClick(double mouseX, double mouseY, int button) {
-        int x = getMenuX();
-        int y = getMenuY();
-        int cardWidth = (MENU_WIDTH - CARD_PADDING * (COLUMNS + 1)) / COLUMNS;
-        int startY = y + CARD_PADDING + (int) scrollOffset;
+        int startX = menuX() + 16;
+        int startY = menuY() + 16;
 
-        for (int i = 0; i < currentModules.size(); i++) {
-            int col = i % COLUMNS;
-            int row = i / COLUMNS;
+        int cardH   = moduleElement.getHeight();
+        int cardW   = ModuleElement.CARD_WIDTH;
+        int padding = ModuleElement.CARD_PADDING;
 
-            int cardX = x + CARD_PADDING + col * (cardWidth + CARD_PADDING);
-            int cardY = startY + row * (CARD_HEIGHT + CARD_PADDING);
-
-            if (mouseX >= cardX && mouseX <= cardX + cardWidth &&
-                mouseY >= cardY && mouseY <= cardY + CARD_HEIGHT) {
-
-                if (button == 0) {
-                    // ЛКМ — toggle модуля
-                    currentModules.get(i).enabled = !currentModules.get(i).enabled;
-                    return true;
-                }
-            }
+        int[] colX = new int[COLUMNS];
+        for (int i = 0; i < COLUMNS; i++) {
+            colX[i] = startX + i * (cardW + padding);
         }
+
+        int[] colY = new int[COLUMNS];
+        Arrays.fill(colY, startY);
+
+        int col = 0;
+        for (ModuleEntry module : currentModules) {
+            int cx = colX[col];
+            int cy = colY[col] + (int) scrollOffset;
+
+            if (moduleElement.mouseClicked(cx, cy, module, mouseX, mouseY, button)) return true;
+
+            colY[col] += cardH + padding;
+            col = (col + 1) % COLUMNS;
+        }
+
         return false;
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        int x = getMenuX();
-        int y = getMenuY();
+    public boolean mouseScrolled(double mouseX, double mouseY, double hAmt, double vAmt) {
+        int x = menuX();
+        int y = menuY();
 
-        if (mouseX >= x && mouseX <= x + MENU_WIDTH &&
-            mouseY >= y && mouseY <= y + MENU_HEIGHT) {
-            scrollOffset += (float) (verticalAmount * 20);
-            if (scrollOffset > 0) scrollOffset = 0;
-            if (scrollOffset < -maxScroll) scrollOffset = -maxScroll;
+        if (mouseX >= x && mouseX <= x + MENU_W &&
+            mouseY >= y && mouseY <= y + MENU_H) {
+            scrollVelocity += (float)(vAmt * 18);
             return true;
         }
 
-        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+        return super.mouseScrolled(mouseX, mouseY, hAmt, vAmt);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == 256) {
+        // Бинды
+        for (List<ModuleEntry> list : modulesByCategory.values()) {
+            for (ModuleEntry m : list) {
+                if (moduleElement.keyPressed(m, keyCode)) return true;
+            }
+        }
+
+        if (keyCode == 256) { // ESC
             close();
             return true;
         }
+
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
+    // ─── Прочее ──────────────────────────────────────────────────────────────
+
     @Override
-    public boolean shouldPause() {
-        return false;
-    }
+    public boolean shouldPause() { return false; }
 
-    // Простая заглушка для модуля
+    @Override
+    public void close() { super.close(); }
+
+    // ─── ModuleEntry (заглушка модуля) ───────────────────────────────────────
+
     public static class ModuleEntry {
-        public String name;
-        public boolean enabled;
+        public String  name;
+        public boolean enabled          = false;
+        public int     bind             = -1;
+        public boolean listeningForBind = false;
 
-        public ModuleEntry(String name, boolean enabled) {
+        public ModuleEntry(String name) {
             this.name = name;
-            this.enabled = enabled;
         }
     }
-                }
+            }
