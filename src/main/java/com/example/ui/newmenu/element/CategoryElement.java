@@ -1,4 +1,4 @@
-package com.example.ui.newmenu.element;
+package com.example.ui.menu.element;
 
 import com.example.util.render.DrawHelper;
 import net.minecraft.client.MinecraftClient;
@@ -11,13 +11,15 @@ import java.util.Map;
 
 public class CategoryElement {
 
+    // ─── Категории ───────────────────────────────────────────────────────────
+
     public enum Category {
-        COMBAT("Combat", "⚔"),
-        MOVEMENT("Movement", "🏃"),
-        RENDER("Render", "👁"),
-        PLAYER("Player", "🧑"),
-        WORLD("World", "🌍"),
-        MISC("Misc", "⚙");
+        COMBAT  ("Combat",   "⚔"),
+        MOVEMENT("Movement", "➤"),
+        RENDER  ("Render",   "◈"),
+        PLAYER  ("Player",   "♟"),
+        WORLD   ("World",    "◉"),
+        MISC    ("Misc",     "⚙");
 
         private final String displayName;
         private final String icon;
@@ -27,31 +29,33 @@ public class CategoryElement {
             this.icon = icon;
         }
 
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public String getIcon() {
-            return icon;
-        }
+        public String getDisplayName() { return displayName; }
+        public String getIcon()        { return icon; }
     }
+
+    // ─── Состояние ───────────────────────────────────────────────────────────
 
     private Category selectedCategory = Category.COMBAT;
     private final Map<Category, int[]> categoryBounds = new LinkedHashMap<>();
 
-    public Category getSelectedCategory() {
-        return selectedCategory;
+    // Плавная анимация выделения (простой lerp)
+    private final Map<Category, Float> selectionAnim = new LinkedHashMap<>();
+
+    public CategoryElement() {
+        for (Category c : Category.values()) {
+            selectionAnim.put(c, c == selectedCategory ? 1f : 0f);
+        }
     }
 
-    public void setSelectedCategory(Category category) {
-        this.selectedCategory = category;
-    }
+    // ─── API ─────────────────────────────────────────────────────────────────
+
+    public Category getSelectedCategory() { return selectedCategory; }
 
     public boolean mouseClicked(double mouseX, double mouseY) {
         for (Map.Entry<Category, int[]> entry : categoryBounds.entrySet()) {
-            int[] bounds = entry.getValue();
-            if (mouseX >= bounds[0] && mouseX <= bounds[0] + bounds[2] &&
-                mouseY >= bounds[1] && mouseY <= bounds[1] + bounds[3]) {
+            int[] b = entry.getValue();
+            if (mouseX >= b[0] && mouseX <= b[0] + b[2] &&
+                mouseY >= b[1] && mouseY <= b[1] + b[3]) {
                 selectedCategory = entry.getKey();
                 return true;
             }
@@ -59,49 +63,70 @@ public class CategoryElement {
         return false;
     }
 
+    // ─── Рендер футера ───────────────────────────────────────────────────────
+
     public void render(DrawContext context, int footerX, int footerY, int footerWidth, int footerHeight) {
-        TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-        Category[] categories = Category.values();
+        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
+        Category[] cats = Category.values();
 
-        int spacing = 24;
+        // === Цвета ===
+        Color selectedText  = new Color(197, 200, 255);
+        Color normalText    = new Color(100, 104, 150);
+        Color selectedBg    = new Color(38, 40, 62);
+        Color selectedLine  = new Color(125, 136, 255);
+
+        // Считаем суммарную ширину для центрирования
+        int spacing = 18;
         int totalWidth = 0;
-        for (Category cat : categories) {
-            totalWidth += textRenderer.getWidth(cat.getDisplayName()) + 4;
+        for (Category c : cats) {
+            totalWidth += tr.getWidth(c.getDisplayName()) + 20; // padding по 10 с каждой стороны
         }
-        totalWidth += spacing * (categories.length - 1);
+        totalWidth += spacing * (cats.length - 1);
 
-        int currentX = footerX + (footerWidth - totalWidth) / 2;
-        int centerY = footerY + (footerHeight - 20) / 2;
+        int startX = footerX + (footerWidth - totalWidth) / 2;
+        int btnH = footerHeight - 8;
+        int btnY = footerY + 4;
 
         categoryBounds.clear();
 
-        for (Category category : categories) {
-            String name = category.getDisplayName();
-            int nameWidth = textRenderer.getWidth(name) + 4;
-            boolean isSelected = (category == selectedCategory);
+        int cx = startX;
+        for (Category cat : cats) {
+            // Анимация lerp
+            float target = (cat == selectedCategory) ? 1f : 0f;
+            float cur = selectionAnim.getOrDefault(cat, 0f);
+            float next = cur + (target - cur) * 0.2f;
+            selectionAnim.put(cat, next);
 
-            int btnWidth = nameWidth + 16;
-            int btnHeight = 20;
-            int btnX = currentX - 8;
-            int btnY = centerY;
+            int nameW = tr.getWidth(cat.getDisplayName());
+            int btnW = nameW + 20;
 
-            if (isSelected) {
-                // Выбранная категория — подсветка
-                DrawHelper.drawRect(context, btnX, btnY, btnWidth, btnHeight,
-                        new Color(51, 56, 94));
-                DrawHelper.drawOutlineRect(context, btnX, btnY, btnWidth, btnHeight,
-                        new Color(75, 80, 140), 1);
-            } else {
-                // Ховер эффект — чуть светлее при наведении
-                DrawHelper.drawRect(context, btnX, btnY, btnWidth, btnHeight,
-                        new Color(35, 37, 50));
+            // Фон кнопки
+            if (next > 0.01f) {
+                int bgAlpha = (int) (next * 255);
+                DrawHelper.drawRoundedRect(context, cx, btnY, btnW, btnH, 4,
+                        new Color(selectedBg.getRed(), selectedBg.getGreen(), selectedBg.getBlue(), bgAlpha));
             }
 
-            Color textColor = isSelected ? new Color(197, 200, 255) : new Color(110, 114, 160);
-            context.drawText(textRenderer, name, currentX, centerY + 6, textColor.getRGB(), false);
+            // Текст
+            int r = blend(normalText.getRed(),   selectedText.getRed(),   next);
+            int g = blend(normalText.getGreen(), selectedText.getGreen(), next);
+            int b = blend(normalText.getBlue(),  selectedText.getBlue(),  next);
+            context.drawText(tr, cat.getDisplayName(), cx + 10, btnY + (btnH - 8) / 2, new Color(r, g, b).getRGB(), false);
 
-            categoryBounds.put(category, new int[]{btnX, btnY, btnWidth, btnHeight});
-            currentX += nameWidth + spacing;
+            // Нижняя линия-акцент для выбранного
+            if (next > 0.01f) {
+                int lineAlpha = (int) (next * 255);
+                DrawHelper.drawAccentBar(context,
+                        cx, btnY + btnH - 2,
+                        btnW, 2);
+            }
+
+            categoryBounds.put(cat, new int[]{cx, btnY, btnW, btnH});
+            cx += btnW + spacing;
         }
+    }
+
+    private int blend(int a, int b, float t) {
+        return (int) (a + (b - a) * t);
     }
 }
