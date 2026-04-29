@@ -1,37 +1,40 @@
 package com.example.util.render;
 
 import net.minecraft.client.gui.DrawContext;
-
 import java.awt.Color;
 
 public class DrawHelper {
 
-    public static void drawRect(DrawContext context, float x, float y, float width, float height, float radius, Color color) {
-        if (width <= 0 || height <= 0) return;
-        int argb = color.getRGB();
-        context.fill((int) x, (int) y, (int) (x + width), (int) (y + height), argb);
-    }
-
-    public static void drawRect(DrawContext context, int x, int y, int width, int height, int radius, Color color) {
+    public static void drawRect(DrawContext context, int x, int y, int width, int height, Color color) {
         if (width <= 0 || height <= 0) return;
         context.fill(x, y, x + width, y + height, color.getRGB());
     }
 
-    public static void drawOutline(DrawContext context, float x, float y, float width, float height, float radius, Color color, float thickness) {
-        int t = Math.max(1, (int) thickness);
-        int c = color.getRGB();
-        int ix = (int) x;
-        int iy = (int) y;
-        int iw = (int) width;
-        int ih = (int) height;
+    public static void drawRect(DrawContext context, float x, float y, float width, float height, Color color) {
+        drawRect(context, (int) x, (int) y, (int) width, (int) height, color);
+    }
 
+    public static void drawOutlineRect(DrawContext context, int x, int y, int width, int height, Color color, int thickness) {
         // Top
-        context.fill(ix, iy, ix + iw, iy + t, c);
+        drawRect(context, x, y, width, thickness, color);
         // Bottom
-        context.fill(ix, iy + ih - t, ix + iw, iy + ih, c);
+        drawRect(context, x, y + height - thickness, width, thickness, color);
         // Left
-        context.fill(ix, iy, ix + t, iy + ih, c);
+        drawRect(context, x, y, thickness, height, color);
         // Right
-        context.fill(ix + iw - t, iy, ix + iw, iy + ih, c);
+        drawRect(context, x + width - thickness, y, thickness, height, color);
+    }
+
+    public static void drawGradientRect(DrawContext context, int x, int y, int width, int height, Color colorTop, Color colorBottom) {
+        if (width <= 0 || height <= 0) return;
+        context.fillGradient(x, y, x + width, y + height, colorTop.getRGB(), colorBottom.getRGB());
+    }
+
+    public static void drawShadow(DrawContext context, int x, int y, int width, int height, int shadowSize) {
+        for (int i = 0; i < shadowSize; i++) {
+            int alpha = (int) (40 * (1.0f - (float) i / shadowSize));
+            Color shadowColor = new Color(0, 0, 0, Math.max(alpha, 0));
+            drawOutlineRect(context, x - i - 1, y - i - 1, width + (i + 1) * 2, height + (i + 1) * 2, shadowColor, 1);
+        }
     }
 }
