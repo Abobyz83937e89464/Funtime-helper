@@ -6,6 +6,6 @@ public class NocturnClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        System.out.println("[Nocturn Client] Initialized!");
+        System.out.println("[Nocturn Client] Client mod loaded!");
     }
 }
