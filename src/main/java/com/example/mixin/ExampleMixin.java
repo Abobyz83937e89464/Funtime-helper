@@ -11,6 +11,6 @@ public class ExampleMixin {
 
     @Inject(at = @At("TAIL"), method = "<init>")
     private void onInit(CallbackInfo ci) {
-        System.out.println("[Nocturn Client] Client initialized!");
+        System.out.println("[Nocturn Client] Initialized!");
     }
 }
