@@ -1,9 +1,10 @@
 package com.example.util.render;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.*;
-import net.minecraft.client.font.TextRenderer;
 import org.joml.Matrix4f;
 
 import java.awt.Color;
@@ -24,6 +25,7 @@ public class DrawHelper {
         Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
 
         BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
         buffer.vertex(matrix, x,         y + height, 0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
@@ -31,7 +33,6 @@ public class DrawHelper {
         buffer.vertex(matrix, x + width, y,          0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
         buffer.vertex(matrix, x,         y,          0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
 
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
         BufferRenderer.drawWithGlobalProgram(buffer.end());
         RenderSystem.disableBlend();
     }
@@ -41,9 +42,9 @@ public class DrawHelper {
             drawRect(context, x, y, width, height, color);
             return;
         }
-        drawRect(context, x + radius, y,              width - radius * 2, height,              color);
-        drawRect(context, x,          y + radius,     radius,             height - radius * 2, color);
-        drawRect(context, x + width - radius, y + radius, radius,         height - radius * 2, color);
+        drawRect(context, x + radius,         y,          width - radius * 2, height,              color);
+        drawRect(context, x,                  y + radius, radius,             height - radius * 2, color);
+        drawRect(context, x + width - radius, y + radius, radius,             height - radius * 2, color);
 
         drawCircleQuarter(context, x + radius,         y + radius,          radius, 180, color);
         drawCircleQuarter(context, x + width - radius, y + radius,          radius, 270, color);
@@ -55,6 +56,7 @@ public class DrawHelper {
         Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
 
         int segments = 12;
         float red   = color.getRed()   / 255f;
@@ -71,16 +73,15 @@ public class DrawHelper {
                 cy + (float) Math.sin(angle) * r,
                 0).color(red, green, blue, alpha);
         }
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
         BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
 
     public static void drawRoundedOutline(DrawContext context, float x, float y, float width, float height, float radius, Color color, float thickness) {
-        drawRect(context, x + radius,             y,                        width - radius * 2, thickness, color);
-        drawRect(context, x + radius,             y + height - thickness,   width - radius * 2, thickness, color);
-        drawRect(context, x,                      y + radius,               thickness, height - radius * 2, color);
-        drawRect(context, x + width - thickness,  y + radius,               thickness, height - radius * 2, color);
+        drawRect(context, x + radius,            y,                      width - radius * 2, thickness,          color);
+        drawRect(context, x + radius,            y + height - thickness, width - radius * 2, thickness,          color);
+        drawRect(context, x,                     y + radius,             thickness,          height - radius * 2, color);
+        drawRect(context, x + width - thickness, y + radius,             thickness,          height - radius * 2, color);
 
         drawArcOutline(context, x + radius,         y + radius,          radius, 180, color, thickness);
         drawArcOutline(context, x + width - radius, y + radius,          radius, 270, color, thickness);
@@ -92,6 +93,7 @@ public class DrawHelper {
         Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
 
         int segments = 12;
         float red   = color.getRed()   / 255f;
@@ -107,7 +109,6 @@ public class DrawHelper {
             buf.vertex(matrix, cx + cos * (r - thickness), cy + sin * (r - thickness), 0).color(red, green, blue, alpha);
             buf.vertex(matrix, cx + cos * r,               cy + sin * r,               0).color(red, green, blue, alpha);
         }
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
         BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
