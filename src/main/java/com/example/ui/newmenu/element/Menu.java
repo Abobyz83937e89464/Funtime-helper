@@ -55,20 +55,20 @@ public class Menu extends Screen {
         maxScroll = Math.max(0, contentH - MENU_H);
     }
 
-    private float mx() { return (MinecraftClient.getInstance().getWindow().getScaledWidth()  - MENU_W) / 2f; }
-    private float my() { return (MinecraftClient.getInstance().getWindow().getScaledHeight() - MENU_H) / 2f; }
+    private float menuX() { return (MinecraftClient.getInstance().getWindow().getScaledWidth()  - MENU_W) / 2f; }
+    private float menuY() { return (MinecraftClient.getInstance().getWindow().getScaledHeight() - MENU_H) / 2f; }
     private float cardW() { return (MENU_W - PAD * (COLS + 1)) / COLS; }
 
     @Override
     public void tick() {
         super.tick();
-        openAnim     += (1f - openAnim)           * 0.12f;
-        scrollOffset += (scrollTarget - scrollOffset) * 0.18f;
+        openAnim     += (1f - openAnim)                * 0.12f;
+        scrollOffset += (scrollTarget - scrollOffset)  * 0.18f;
     }
 
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        float mx = mx(), my = my();
+        float mx = menuX(), my = menuY();
         float totalH = HEAD_H + MENU_H + FOOT_H;
 
         // Затемнение фона
@@ -77,7 +77,7 @@ public class Menu extends Screen {
             MinecraftClient.getInstance().getWindow().getScaledHeight(),
             new Color(0, 0, 0, (int)(130 * openAnim)));
 
-        // Анимация масштаба
+        // Анимация открытия
         float scale = 0.88f + openAnim * 0.12f;
         float cx = mx + MENU_W / 2f, cy = my + MENU_H / 2f;
         ctx.getMatrices().push();
@@ -89,7 +89,8 @@ public class Menu extends Screen {
         DrawHelper.drawShadow(ctx, mx, my - HEAD_H, MENU_W, totalH, 10);
 
         // Header
-        DrawHelper.drawRoundedRect(ctx, mx, my - HEAD_H, MENU_W, HEAD_H, 12, new Color(22, 24, 34, (int)(255*openAnim)));
+        DrawHelper.drawRoundedRect(ctx, mx, my - HEAD_H, MENU_W, HEAD_H, 12,
+            new Color(22, 24, 34, (int)(255*openAnim)));
         DrawHelper.drawGradientRectH(ctx, mx, my - HEAD_H, MENU_W * 0.3f, HEAD_H,
             new Color(51, 56, 94, (int)(70*openAnim)), new Color(22, 24, 34, 0));
         renderHeader(ctx, mx, my - HEAD_H);
@@ -107,36 +108,43 @@ public class Menu extends Screen {
         DrawHelper.drawRect(ctx, mx, my + MENU_H, MENU_W, 1, new Color(40, 42, 60, (int)(255*openAnim)));
 
         // Footer
-        DrawHelper.drawRoundedRect(ctx, mx, my + MENU_H + 1, MENU_W, FOOT_H - 1, 12, new Color(22, 24, 34, (int)(255*openAnim)));
+        DrawHelper.drawRoundedRect(ctx, mx, my + MENU_H + 1, MENU_W, FOOT_H - 1, 12,
+            new Color(22, 24, 34, (int)(255*openAnim)));
         categoryElement.render(ctx, mx, my + MENU_H + 1, MENU_W, FOOT_H - 1);
 
         // Общий outline
-        DrawHelper.drawRoundedOutline(ctx, mx-1, my-HEAD_H-1, MENU_W+2, totalH+2, 12, new Color(52, 51, 64, (int)(255*openAnim)), 1);
+        DrawHelper.drawRoundedOutline(ctx, mx-1, my-HEAD_H-1, MENU_W+2, totalH+2, 12,
+            new Color(52, 51, 64, (int)(255*openAnim)), 1);
 
         ctx.getMatrices().pop();
     }
 
     private void renderHeader(DrawContext ctx, float x, float y) {
         int a = (int)(255 * openAnim);
-        var boldFont   = Fonts.getBold();
-        var regularFont = Fonts.getRegular();
 
-        float ty = y + (HEAD_H - boldFont.fontHeight) / 2f;
+        float ty = y + (HEAD_H - Fonts.getBold().fontHeight) / 2f;
 
-        // Логотип
-        DrawHelper.drawTextShadow(ctx, boldFont, "Nocturn", x + 16, ty, new Color(197, 200, 255, a));
-        DrawHelper.drawText(ctx, regularFont, " Client", x + 16 + boldFont.getWidth("Nocturn"), ty, new Color(125, 136, 255, a));
+        // Логотип слева
+        DrawHelper.drawTextShadow(ctx, Fonts.getBold(), "Nocturn",
+            x + 16, ty, new Color(197, 200, 255, a));
+        DrawHelper.drawText(ctx, Fonts.getRegular(), " Client",
+            x + 16 + Fonts.getBold().getWidth("Nocturn"), ty, new Color(125, 136, 255, a));
 
-        // Версия
+        // Версия справа
         String ver = "v1.0  |  1.21.4";
-        DrawHelper.drawText(ctx, regularFont, ver, x + MENU_W - regularFont.getWidth(ver) - 16, ty, new Color(80, 84, 120, a));
+        DrawHelper.drawText(ctx, Fonts.getRegular(), ver,
+            x + MENU_W - Fonts.getRegular().getWidth(ver) - 16, ty,
+            new Color(80, 84, 120, a));
 
         // Категория по центру
         String cat = categoryElement.getSelectedCategory().getDisplayName();
-        DrawHelper.drawText(ctx, regularFont, cat, x + (MENU_W - regularFont.getWidth(cat)) / 2f, ty, new Color(141, 144, 199, a));
+        DrawHelper.drawText(ctx, Fonts.getRegular(), cat,
+            x + (MENU_W - Fonts.getRegular().getWidth(cat)) / 2f, ty,
+            new Color(141, 144, 199, a));
 
         // Точка под категорией
-        DrawHelper.drawRoundedRect(ctx, x + MENU_W/2f - 2, y + HEAD_H - 4, 4, 3, 1, new Color(125, 136, 255, (int)(180*openAnim)));
+        DrawHelper.drawRoundedRect(ctx, x + MENU_W/2f - 2, y + HEAD_H - 4, 4, 3, 1,
+            new Color(125, 136, 255, (int)(180*openAnim)));
     }
 
     private void renderContent(DrawContext ctx, float x, float y, int mouseX, int mouseY) {
@@ -154,9 +162,11 @@ public class Menu extends Screen {
 
         ctx.disableScissor();
 
-        // Fade
-        DrawHelper.drawGradientRect(ctx, x, y, MENU_W, 18, new Color(17,19,24,(int)(220*openAnim)), new Color(17,19,24,0));
-        DrawHelper.drawGradientRect(ctx, x, y+MENU_H-18, MENU_W, 18, new Color(17,19,24,0), new Color(17,19,24,(int)(220*openAnim)));
+        // Fade сверху и снизу
+        DrawHelper.drawGradientRect(ctx, x, y, MENU_W, 18,
+            new Color(17,19,24,(int)(220*openAnim)), new Color(17,19,24,0));
+        DrawHelper.drawGradientRect(ctx, x, y+MENU_H-18, MENU_W, 18,
+            new Color(17,19,24,0), new Color(17,19,24,(int)(220*openAnim)));
 
         // Scrollbar
         if (maxScroll > 0) {
@@ -164,19 +174,23 @@ public class Menu extends Screen {
             float thumbH = Math.max(30, trackH * MENU_H / (MENU_H + maxScroll));
             float prog   = scrollOffset / -maxScroll;
             float thumbY = y + 4 + prog * (trackH - thumbH);
-            DrawHelper.drawRoundedRect(ctx, x+MENU_W-4, y+4, 3, trackH, 2, new Color(28,30,42));
-            DrawHelper.drawRoundedRect(ctx, x+MENU_W-4, thumbY, 3, thumbH, 2, new Color(125,136,255,200));
+            DrawHelper.drawRoundedRect(ctx, x+MENU_W-4, y+4, 3, trackH, 2,
+                new Color(28,30,42));
+            DrawHelper.drawRoundedRect(ctx, x+MENU_W-4, thumbY, 3, thumbH, 2,
+                new Color(125,136,255,200));
         }
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        float x = mx(), y = my();
+        float x = menuX(), y = menuY();
 
+        // Footer — категории
         if (mouseY >= y+MENU_H+1 && mouseY <= y+MENU_H+FOOT_H) {
             if (categoryElement.mouseClicked(mouseX, mouseY)) { loadModules(); return true; }
         }
 
+        // Content — модули
         if (mouseY >= y && mouseY <= y+MENU_H) {
             float cw = cardW(), ch = moduleElement.getHeight();
             float startY = y + PAD + scrollOffset;
@@ -193,8 +207,8 @@ public class Menu extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double h, double v) {
-        float x = mx(), y = my();
-        if (mouseX>=x&&mouseX<=x+MENU_W&&mouseY>=y&&mouseY<=y+MENU_H) {
+        float x = menuX(), y = menuY();
+        if (mouseX>=x && mouseX<=x+MENU_W && mouseY>=y && mouseY<=y+MENU_H) {
             scrollTarget = Math.max(-maxScroll, Math.min(0, scrollTarget+(float)(v*22)));
             return true;
         }
@@ -212,6 +226,9 @@ public class Menu extends Screen {
     public static class ModuleEntry {
         public String name;
         public boolean enabled;
-        public ModuleEntry(String name, boolean enabled) { this.name = name; this.enabled = enabled; }
+        public ModuleEntry(String name, boolean enabled) {
+            this.name = name;
+            this.enabled = enabled;
+        }
     }
 }
