@@ -1,9 +1,7 @@
-package com.example.ui.menu.element;
+package com.example.ui.newmenu.element;
 
-import com.example.ui.menu.Menu.ModuleEntry;
 import com.example.util.render.DrawHelper;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
+import com.example.util.render.Fonts;
 import net.minecraft.client.gui.DrawContext;
 
 import java.awt.Color;
@@ -12,171 +10,87 @@ import java.util.Map;
 
 public class ModuleElement {
 
-    // Анимация включения для каждого модуля (lerp 0..1)
-    private final Map<ModuleEntry, Float> enableAnim = new HashMap<>();
+    private final Map<String, Float> hoverAnim  = new HashMap<>();
+    private final Map<String, Float> toggleAnim = new HashMap<>();
 
-    // ─── Константы ───────────────────────────────────────────────────────────
+    public void render(DrawContext ctx, float x, float y, float w, Menu.ModuleEntry module, double mx, double my) {
+        float h = getHeight();
+        float radius = 8f;
 
-    public static final int CARD_WIDTH  = 255;
-    public static final int CARD_PADDING = 14;
+        boolean hovered = mx >= x && mx <= x+w && my >= y && my <= y+h;
 
-    // ─── Рендер карточки ─────────────────────────────────────────────────────
+        float ha = hoverAnim.getOrDefault(module.name, 0f);
+        ha += ((hovered ? 1f : 0f) - ha) * 0.15f;
+        hoverAnim.put(module.name, ha);
 
-    public void render(DrawContext context, int x, int y, ModuleEntry module) {
-        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
+        float ta = toggleAnim.getOrDefault(module.name, module.enabled ? 1f : 0f);
+        ta += ((module.enabled ? 1f : 0f) - ta) * 0.12f;
+        toggleAnim.put(module.name, ta);
 
-        // Обновляем анимацию
-        float target = module.enabled ? 1f : 0f;
-        float cur = enableAnim.getOrDefault(module, module.enabled ? 1f : 0f);
-        float next = cur + (target - cur) * 0.15f;
-        enableAnim.put(module, next);
+        // === Фон ===
+        Color bg = new Color(
+            (int)(22 + ha*10 + ta*6),
+            (int)(23 + ha*10 + ta*6),
+            (int)(32 + ha*10 + ta*12), 255);
+        DrawHelper.drawRoundedRect(ctx, x, y, w, h, radius, bg);
 
-        // ─── Цвета ───────────────────────────────────────────────────────────
-        Color bgCard     = new Color(28, 29, 38);
-        Color bgCardOn   = new Color(32, 34, 50);
-        Color outlineOff = new Color(38, 39, 52);
-        Color outlineOn  = new Color(75, 80, 140);
-        Color nameOff    = new Color(127, 133, 172);
-        Color nameOn     = new Color(197, 200, 255);
-
-        int r, g, b;
-
-        // Фон карточки (lerp)
-        r = blend(bgCard.getRed(),   bgCardOn.getRed(),   next);
-        g = blend(bgCard.getGreen(), bgCardOn.getGreen(), next);
-        b = blend(bgCard.getBlue(),  bgCardOn.getBlue(),  next);
-        Color bgColor = new Color(r, g, b);
-
-        // Outline (lerp)
-        r = blend(outlineOff.getRed(),   outlineOn.getRed(),   next);
-        g = blend(outlineOff.getGreen(), outlineOn.getGreen(), next);
-        b = blend(outlineOff.getBlue(),  outlineOn.getBlue(),  next);
-        Color outColor = new Color(r, g, b);
-
-        // ─── Название над карточкой ──────────────────────────────────────────
-        r = blend(nameOff.getRed(),   nameOn.getRed(),   next);
-        g = blend(nameOff.getGreen(), nameOn.getGreen(), next);
-        b = blend(nameOff.getBlue(),  nameOn.getBlue(),  next);
-        Color nameColor = new Color(r, g, b);
-
-        context.drawText(tr, module.name, x, y, nameColor.getRGB(), false);
-
-        // ─── Сама панель ─────────────────────────────────────────────────────
-        int panelY = y + tr.fontHeight + 4;
-        int panelH = getPanelHeight();
-
-        // Фон
-        DrawHelper.drawRect(context, x, panelY, CARD_WIDTH, panelH, bgColor);
-        // Outline
-        DrawHelper.drawOutlineRect(context, x - 2, panelY - 2, CARD_WIDTH + 4, panelH + 4, outColor, 2);
-
-        // Акцентная полоска сверху при включённом
-        if (next > 0.01f) {
-            DrawHelper.drawAccentBar(context, x, panelY, (int)(CARD_WIDTH * next), 2);
+        // === Gradient overlay (сверху) ===
+        if (ta > 0.01f) {
+            DrawHelper.drawGradientRect(ctx, x, y, w, h * 0.45f,
+                new Color(51, 56, 94, (int)(55 * ta)),
+                new Color(51, 56, 94, 0));
         }
 
-        // ─── Toggle строка ───────────────────────────────────────────────────
-        int innerY = panelY + 10;
+        // === Outline ===
+        Color ol = new Color(
+            (int)(33 + ta*42 + ha*10),
+            (int)(32 + ta*48 + ha*10),
+            (int)(43 + ta*97 + ha*10), 255);
+        DrawHelper.drawRoundedOutline(ctx, x, y, w, h, radius, ol, 1);
 
-        // "Enabled" метка
-        context.drawText(tr, "Enabled", x + 10, innerY, new Color(127, 133, 172).getRGB(), false);
-
-        // Переключатель справа
-        int toggleW = 30;
-        int toggleH = 12;
-        int toggleX = x + CARD_WIDTH - toggleW - 10;
-        int toggleY = innerY - 2;
-
-        Color toggleBg = new Color(
-                blend(33, 51, next),
-                blend(35, 56, next),
-                blend(48, 94, next)
-        );
-        DrawHelper.drawRoundedRect(context, toggleX, toggleY, toggleW, toggleH, 5, toggleBg);
-
-        int knobSize = 8;
-        int knobX = (int)(toggleX + 2 + (toggleW - knobSize - 4) * next);
-        int knobY = toggleY + 2;
-        Color knobColor = new Color(
-                blend(90, 125, next),
-                blend(95, 136, next),
-                blend(140, 255, next)
-        );
-        DrawHelper.drawRoundedRect(context, knobX, knobY, knobSize, knobSize, 4, knobColor);
-
-        // Бинд
-        String bind = module.bind > 0 ? keyName(module.bind) : "NONE";
-        String bindText = "[" + bind + "]";
-        int bindW = tr.getWidth(bindText);
-        context.drawText(tr, bindText,
-                x + CARD_WIDTH - bindW - 10,
-                innerY + tr.fontHeight + 6,
-                new Color(55, 58, 85).getRGB(), false);
-    }
-
-    // ─── Клик по карточке ────────────────────────────────────────────────────
-
-    public boolean mouseClicked(int x, int y, ModuleEntry module, double mouseX, double mouseY, int button) {
-        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
-        int panelY = y + tr.fontHeight + 4;
-        int panelH = getPanelHeight();
-
-        if (mouseX >= x && mouseX <= x + CARD_WIDTH &&
-            mouseY >= panelY && mouseY <= panelY + panelH) {
-
-            if (button == 0) { // ЛКМ — toggle
-                module.enabled = !module.enabled;
-                return true;
-            }
-            if (button == 1) { // ПКМ — задать бинд (заглушка)
-                module.listeningForBind = !module.listeningForBind;
-                return true;
-            }
+        // === Акцент сверху (тонкая линия) ===
+        if (ta > 0.01f) {
+            DrawHelper.drawRoundedRect(ctx,
+                x + radius, y, w - radius*2, 2, 1,
+                new Color(125, 136, 255, (int)(255 * ta)));
         }
-        return false;
+
+        // === Название ===
+        Color nameC = new Color(
+            (int)(127 + ta*70),
+            (int)(133 + ta*67),
+            (int)(172 + ta*83), 255);
+        DrawHelper.drawTextShadow(ctx, Fonts.BOLD, module.name, x + 12, y + 10, nameC);
+
+        // === Статус ===
+        String status = module.enabled ? "enabled" : "disabled";
+        Color statusC = module.enabled
+            ? new Color(100, 210, 130, (int)(180 + ta*75))
+            : new Color(70, 73, 100);
+        DrawHelper.drawText(ctx, Fonts.REGULAR, status, x + 12, y + 10 + Fonts.BOLD.fontHeight + 4, statusC);
+
+        // === Toggle кнопка ===
+        float tw = 30f, th = 15f;
+        float tx = x + w - tw - 10;
+        float ty = y + (h - th) / 2f;
+
+        Color tbg = new Color(
+            (int)(21 + ta*30),
+            (int)(22 + ta*34),
+            (int)(29 + ta*65), 255);
+        DrawHelper.drawRoundedRect(ctx, tx, ty, tw, th, th/2f, tbg);
+        DrawHelper.drawRoundedOutline(ctx, tx, ty, tw, th, th/2f, ol, 1);
+
+        // Кружок
+        float cs = th - 4;
+        float cx2 = tx + 2 + ta * (tw - cs - 4);
+        float cy2 = ty + 2;
+        Color cc = new Color(
+            (int)(80 + ta*45),
+            (int)(90 + ta*46),
+            (int)(150 + ta*105), 255);
+        DrawHelper.drawRoundedRect(ctx, cx2, cy2, cs, cs, cs/2f, cc);
     }
 
-    public boolean keyPressed(ModuleEntry module, int keyCode) {
-        if (module.listeningForBind) {
-            if (keyCode == 256) { // ESC — сброс
-                module.bind = -1;
-            } else {
-                module.bind = keyCode;
-            }
-            module.listeningForBind = false;
-            return true;
-        }
-        return false;
-    }
-
-    // ─── Размеры ─────────────────────────────────────────────────────────────
-
-    private int getPanelHeight() {
-        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
-        // Панель: padding 10 + toggle строка + bind строка + padding 10
-        return 10 + tr.fontHeight + 6 + tr.fontHeight + 10;
-    }
-
-    public int getHeight() {
-        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
-        return tr.fontHeight + 4 + getPanelHeight();
-    }
-
-    // ─── Хелперы ─────────────────────────────────────────────────────────────
-
-    private int blend(int a, int b, float t) {
-        return Math.min(255, Math.max(0, (int)(a + (b - a) * t)));
-    }
-
-    private String keyName(int keyCode) {
-        return switch (keyCode) {
-            case 256 -> "ESC";
-            case 32  -> "SPACE";
-            case 340 -> "LSHIFT";
-            case 341 -> "LCTRL";
-            default  -> keyCode >= 65 && keyCode <= 90
-                    ? String.valueOf((char) keyCode)
-                    : "KEY" + keyCode;
-        };
-    }
+    public float getHeight() { return 52f; }
 }
