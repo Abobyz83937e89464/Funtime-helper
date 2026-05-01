@@ -27,32 +27,43 @@ public class ModuleElement {
         toggleAnim.put(module.name, ta);
 
         // Фон
-        Color bg = new Color((int)(22+ha*10+ta*6), (int)(23+ha*10+ta*6), (int)(32+ha*10+ta*12), 255);
+        Color bg = new Color(
+            (int)(22+ha*10+ta*6),
+            (int)(23+ha*10+ta*6),
+            (int)(32+ha*10+ta*12), 255);
         DrawHelper.drawRoundedRect(ctx, x, y, w, h, radius, bg);
 
         // Gradient overlay
         if (ta > 0.01f)
-            DrawHelper.drawGradientRect(ctx, x, y, w, h*0.45f, new Color(51,56,94,(int)(55*ta)), new Color(51,56,94,0));
+            DrawHelper.drawGradientRect(ctx, x, y, w, h*0.45f,
+                new Color(51,56,94,(int)(55*ta)), new Color(51,56,94,0));
 
         // Outline
-        Color ol = new Color((int)(33+ta*42+ha*10), (int)(32+ta*48+ha*10), (int)(43+ta*97+ha*10), 255);
+        Color ol = new Color(
+            (int)(33+ta*42+ha*10),
+            (int)(32+ta*48+ha*10),
+            (int)(43+ta*97+ha*10), 255);
         DrawHelper.drawRoundedOutline(ctx, x, y, w, h, radius, ol, 1);
 
         // Акцент сверху
         if (ta > 0.01f)
-            DrawHelper.drawRoundedRect(ctx, x+radius, y, w-radius*2, 2, 1, new Color(125, 136, 255, (int)(255*ta)));
-
-        var boldFont   = Fonts.getBold();
-        var regularFont = Fonts.getRegular();
+            DrawHelper.drawRoundedRect(ctx, x+radius, y, w-radius*2, 2, 1,
+                new Color(125, 136, 255, (int)(255*ta)));
 
         // Название
-        Color nameC = new Color((int)(127+ta*70), (int)(133+ta*67), (int)(172+ta*83), 255);
-        DrawHelper.drawTextShadow(ctx, boldFont, module.name, x+12, y+10, nameC);
+        Color nameC = new Color(
+            (int)(127+ta*70),
+            (int)(133+ta*67),
+            (int)(172+ta*83), 255);
+        DrawHelper.drawTextShadow(ctx, Fonts.getBold(), module.name, x+12, y+10, nameC);
 
         // Статус
         String status = module.enabled ? "enabled" : "disabled";
-        Color statusC = module.enabled ? new Color(100, 210, 130, (int)(180+ta*75)) : new Color(70, 73, 100);
-        DrawHelper.drawText(ctx, regularFont, status, x+12, y+10+boldFont.fontHeight+4, statusC);
+        Color statusC = module.enabled
+            ? new Color(100, 210, 130, (int)(180+ta*75))
+            : new Color(70, 73, 100);
+        DrawHelper.drawText(ctx, Fonts.getRegular(), status,
+            x+12, y+10+Fonts.getBold().fontHeight+4, statusC);
 
         // Toggle кнопка
         float tw = 30f, th = 15f;
@@ -63,7 +74,8 @@ public class ModuleElement {
 
         float cs = th-4;
         float cx2 = tx+2+ta*(tw-cs-4), cy2 = ty+2;
-        DrawHelper.drawRoundedRect(ctx, cx2, cy2, cs, cs, cs/2f, new Color((int)(80+ta*45), (int)(90+ta*46), (int)(150+ta*105), 255));
+        DrawHelper.drawRoundedRect(ctx, cx2, cy2, cs, cs, cs/2f,
+            new Color((int)(80+ta*45), (int)(90+ta*46), (int)(150+ta*105), 255));
     }
 
     public float getHeight() { return 52f; }
