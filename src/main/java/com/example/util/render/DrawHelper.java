@@ -3,6 +3,7 @@ package com.example.util.render;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.*;
+import net.minecraft.client.font.TextRenderer;
 import org.joml.Matrix4f;
 
 import java.awt.Color;
@@ -21,24 +22,29 @@ public class DrawHelper {
 
     public static void drawGradientRectH(DrawContext context, float x, float y, float width, float height, Color left, Color right) {
         Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
 
         BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-        buffer.vertex(matrix, x, y + height, 0).color(left.getRed(), left.getGreen(), left.getBlue(), left.getAlpha());
+        buffer.vertex(matrix, x,         y + height, 0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
         buffer.vertex(matrix, x + width, y + height, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
-        buffer.vertex(matrix, x + width, y, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
-        buffer.vertex(matrix, x, y, 0).color(left.getRed(), left.getGreen(), left.getBlue(), left.getAlpha());
+        buffer.vertex(matrix, x + width, y,          0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buffer.vertex(matrix, x,         y,          0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
+
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
         BufferRenderer.drawWithGlobalProgram(buffer.end());
         RenderSystem.disableBlend();
     }
 
     public static void drawRoundedRect(DrawContext context, float x, float y, float width, float height, float radius, Color color) {
-        if (radius <= 0) { drawRect(context, x, y, width, height, color); return; }
-        drawRect(context, x + radius, y, width - radius * 2, height, color);
-        drawRect(context, x, y + radius, radius, height - radius * 2, color);
-        drawRect(context, x + width - radius, y + radius, radius, height - radius * 2, color);
+        if (radius <= 0) {
+            drawRect(context, x, y, width, height, color);
+            return;
+        }
+        drawRect(context, x + radius, y,              width - radius * 2, height,              color);
+        drawRect(context, x,          y + radius,     radius,             height - radius * 2, color);
+        drawRect(context, x + width - radius, y + radius, radius,         height - radius * 2, color);
+
         drawCircleQuarter(context, x + radius,         y + radius,          radius, 180, color);
         drawCircleQuarter(context, x + width - radius, y + radius,          radius, 270, color);
         drawCircleQuarter(context, x + width - radius, y + height - radius, radius, 0,   color);
@@ -47,7 +53,6 @@ public class DrawHelper {
 
     private static void drawCircleQuarter(DrawContext context, float cx, float cy, float r, float startDeg, Color color) {
         Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
 
@@ -62,24 +67,21 @@ public class DrawHelper {
         for (int i = 0; i <= segments; i++) {
             double angle = Math.toRadians(startDeg + 90.0 * i / segments);
             buf.vertex(matrix,
-                    cx + (float) Math.cos(angle) * r,
-                    cy + (float) Math.sin(angle) * r,
-                    0).color(red, green, blue, alpha);
+                cx + (float) Math.cos(angle) * r,
+                cy + (float) Math.sin(angle) * r,
+                0).color(red, green, blue, alpha);
         }
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
         BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
 
     public static void drawRoundedOutline(DrawContext context, float x, float y, float width, float height, float radius, Color color, float thickness) {
-        // Top
-        drawRect(context, x + radius, y, width - radius * 2, thickness, color);
-        // Bottom
-        drawRect(context, x + radius, y + height - thickness, width - radius * 2, thickness, color);
-        // Left
-        drawRect(context, x, y + radius, thickness, height - radius * 2, color);
-        // Right
-        drawRect(context, x + width - thickness, y + radius, thickness, height - radius * 2, color);
-        // Corners
+        drawRect(context, x + radius,             y,                        width - radius * 2, thickness, color);
+        drawRect(context, x + radius,             y + height - thickness,   width - radius * 2, thickness, color);
+        drawRect(context, x,                      y + radius,               thickness, height - radius * 2, color);
+        drawRect(context, x + width - thickness,  y + radius,               thickness, height - radius * 2, color);
+
         drawArcOutline(context, x + radius,         y + radius,          radius, 180, color, thickness);
         drawArcOutline(context, x + width - radius, y + radius,          radius, 270, color, thickness);
         drawArcOutline(context, x + width - radius, y + height - radius, radius, 0,   color, thickness);
@@ -88,7 +90,6 @@ public class DrawHelper {
 
     private static void drawArcOutline(DrawContext context, float cx, float cy, float r, float startDeg, Color color, float thickness) {
         Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
 
@@ -106,6 +107,7 @@ public class DrawHelper {
             buf.vertex(matrix, cx + cos * (r - thickness), cy + sin * (r - thickness), 0).color(red, green, blue, alpha);
             buf.vertex(matrix, cx + cos * r,               cy + sin * r,               0).color(red, green, blue, alpha);
         }
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
         BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
@@ -113,16 +115,16 @@ public class DrawHelper {
     public static void drawShadow(DrawContext context, float x, float y, float width, float height, int layers) {
         for (int i = layers; i > 0; i--) {
             int a = (int)(55.0f * ((float)(layers - i + 1) / layers));
-            Color c = new Color(0, 0, 0, Math.max(a, 0));
-            drawRoundedOutline(context, x - i, y - i, width + i * 2, height + i * 2, 10 + i, c, 1);
+            drawRoundedOutline(context, x - i, y - i, width + i * 2, height + i * 2,
+                    10 + i, new Color(0, 0, 0, Math.max(a, 0)), 1);
         }
     }
 
-    public static void drawText(DrawContext context, net.minecraft.client.font.TextRenderer font, String text, float x, float y, Color color) {
+    public static void drawText(DrawContext context, TextRenderer font, String text, float x, float y, Color color) {
         context.drawText(font, text, (int) x, (int) y, color.getRGB(), false);
     }
 
-    public static void drawTextShadow(DrawContext context, net.minecraft.client.font.TextRenderer font, String text, float x, float y, Color color) {
+    public static void drawTextShadow(DrawContext context, TextRenderer font, String text, float x, float y, Color color) {
         context.drawText(font, text, (int) x, (int) y, color.getRGB(), true);
     }
 }
