@@ -11,102 +11,107 @@ import java.awt.Color;
 
 public class DrawHelper {
 
-    public static void drawRect(DrawContext context, float x, float y, float width, float height, Color color) {
-        if (width <= 0 || height <= 0) return;
-        context.fill((int) x, (int) y, (int)(x + width), (int)(y + height), color.getRGB());
+    public static void drawRect(DrawContext ctx, float x, float y, float w, float h, int color) {
+        if (w <= 0 || h <= 0) return;
+        ctx.fill((int)x, (int)y, (int)(x+w), (int)(y+h), color);
     }
 
-    public static void drawGradientRect(DrawContext context, float x, float y, float width, float height, Color top, Color bottom) {
-        if (width <= 0 || height <= 0) return;
-        context.fillGradient((int) x, (int) y, (int)(x + width), (int)(y + height), top.getRGB(), bottom.getRGB());
+    public static void drawRect(DrawContext ctx, float x, float y, float w, float h, Color color) {
+        drawRect(ctx, x, y, w, h, color.getRGB());
     }
 
-    public static void drawGradientRectH(DrawContext context, float x, float y, float width, float height, Color left, Color right) {
-        Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+    public static void drawGradientV(DrawContext ctx, float x, float y, float w, float h, Color top, Color bottom) {
+        if (w <= 0 || h <= 0) return;
+        ctx.fillGradient((int)x, (int)y, (int)(x+w), (int)(y+h), top.getRGB(), bottom.getRGB());
+    }
+
+    public static void drawGradientH(DrawContext ctx, float x, float y, float w, float h, Color left, Color right) {
+        if (w <= 0 || h <= 0) return;
+        Matrix4f m = ctx.getMatrices().peek().getPositionMatrix();
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-        buffer.vertex(matrix, x,         y + height, 0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
-        buffer.vertex(matrix, x + width, y + height, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
-        buffer.vertex(matrix, x + width, y,          0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
-        buffer.vertex(matrix, x,         y,          0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
-        BufferRenderer.drawWithGlobalProgram(buffer.end());
+        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+        buf.vertex(m, x,   y+h, 0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
+        buf.vertex(m, x+w, y+h, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buf.vertex(m, x+w, y,   0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buf.vertex(m, x,   y,   0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
+        BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
 
-    public static void drawRoundedRect(DrawContext context, float x, float y, float width, float height, float radius, Color color) {
-        if (radius <= 0) { drawRect(context, x, y, width, height, color); return; }
-        drawRect(context, x + radius,         y,          width - radius * 2, height,              color);
-        drawRect(context, x,                  y + radius, radius,             height - radius * 2, color);
-        drawRect(context, x + width - radius, y + radius, radius,             height - radius * 2, color);
-        drawCircleQuarter(context, x + radius,         y + radius,          radius, 180, color);
-        drawCircleQuarter(context, x + width - radius, y + radius,          radius, 270, color);
-        drawCircleQuarter(context, x + width - radius, y + height - radius, radius, 0,   color);
-        drawCircleQuarter(context, x + radius,         y + height - radius, radius, 90,  color);
+    public static void drawRoundedRect(DrawContext ctx, float x, float y, float w, float h, float r, Color color) {
+        if (r <= 0) { drawRect(ctx, x, y, w, h, color); return; }
+        drawRect(ctx, x+r, y,   w-r*2, h,   color);
+        drawRect(ctx, x,   y+r, r,     h-r*2, color);
+        drawRect(ctx, x+w-r, y+r, r,   h-r*2, color);
+        drawCorner(ctx, x+r,   y+r,   r, 180, color);
+        drawCorner(ctx, x+w-r, y+r,   r, 270, color);
+        drawCorner(ctx, x+w-r, y+h-r, r, 0,   color);
+        drawCorner(ctx, x+r,   y+h-r, r, 90,  color);
     }
 
-    private static void drawCircleQuarter(DrawContext context, float cx, float cy, float r, float startDeg, Color color) {
-        Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+    private static void drawCorner(DrawContext ctx, float cx, float cy, float r, float startDeg, Color color) {
+        Matrix4f m = ctx.getMatrices().peek().getPositionMatrix();
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        int segments = 12;
         float red = color.getRed()/255f, green = color.getGreen()/255f,
               blue = color.getBlue()/255f, alpha = color.getAlpha()/255f;
+        int seg = 10;
         BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
-        buf.vertex(matrix, cx, cy, 0).color(red, green, blue, alpha);
-        for (int i = 0; i <= segments; i++) {
-            double angle = Math.toRadians(startDeg + 90.0 * i / segments);
-            buf.vertex(matrix, cx + (float)Math.cos(angle)*r, cy + (float)Math.sin(angle)*r, 0).color(red, green, blue, alpha);
+        buf.vertex(m, cx, cy, 0).color(red, green, blue, alpha);
+        for (int i = 0; i <= seg; i++) {
+            double a = Math.toRadians(startDeg + 90.0*i/seg);
+            buf.vertex(m, cx+(float)Math.cos(a)*r, cy+(float)Math.sin(a)*r, 0).color(red, green, blue, alpha);
         }
         BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
 
-    public static void drawRoundedOutline(DrawContext context, float x, float y, float width, float height, float radius, Color color, float thickness) {
-        drawRect(context, x + radius,            y,                      width - radius * 2, thickness,           color);
-        drawRect(context, x + radius,            y + height - thickness, width - radius * 2, thickness,           color);
-        drawRect(context, x,                     y + radius,             thickness,          height - radius * 2, color);
-        drawRect(context, x + width - thickness, y + radius,             thickness,          height - radius * 2, color);
-        drawArcOutline(context, x + radius,         y + radius,          radius, 180, color, thickness);
-        drawArcOutline(context, x + width - radius, y + radius,          radius, 270, color, thickness);
-        drawArcOutline(context, x + width - radius, y + height - radius, radius, 0,   color, thickness);
-        drawArcOutline(context, x + radius,         y + height - radius, radius, 90,  color, thickness);
+    public static void drawOutline(DrawContext ctx, float x, float y, float w, float h, float r, Color color) {
+        drawRect(ctx, x+r, y,       w-r*2, 1, color);
+        drawRect(ctx, x+r, y+h-1,   w-r*2, 1, color);
+        drawRect(ctx, x,   y+r,     1,     h-r*2, color);
+        drawRect(ctx, x+w-1, y+r,   1,     h-r*2, color);
+        drawArcOutline(ctx, x+r,   y+r,   r, 180, color);
+        drawArcOutline(ctx, x+w-r, y+r,   r, 270, color);
+        drawArcOutline(ctx, x+w-r, y+h-r, r, 0,   color);
+        drawArcOutline(ctx, x+r,   y+h-r, r, 90,  color);
     }
 
-    private static void drawArcOutline(DrawContext context, float cx, float cy, float r, float startDeg, Color color, float thickness) {
-        Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+    private static void drawArcOutline(DrawContext ctx, float cx, float cy, float r, float startDeg, Color color) {
+        Matrix4f m = ctx.getMatrices().peek().getPositionMatrix();
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        int segments = 12;
         float red = color.getRed()/255f, green = color.getGreen()/255f,
               blue = color.getBlue()/255f, alpha = color.getAlpha()/255f;
+        int seg = 10;
         BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
-        for (int i = 0; i <= segments; i++) {
-            double angle = Math.toRadians(startDeg + 90.0 * i / segments);
-            float cos = (float)Math.cos(angle), sin = (float)Math.sin(angle);
-            buf.vertex(matrix, cx+cos*(r-thickness), cy+sin*(r-thickness), 0).color(red, green, blue, alpha);
-            buf.vertex(matrix, cx+cos*r,             cy+sin*r,             0).color(red, green, blue, alpha);
+        for (int i = 0; i <= seg; i++) {
+            double a = Math.toRadians(startDeg + 90.0*i/seg);
+            float cos = (float)Math.cos(a), sin = (float)Math.sin(a);
+            buf.vertex(m, cx+cos*(r-1), cy+sin*(r-1), 0).color(red, green, blue, alpha);
+            buf.vertex(m, cx+cos*r,     cy+sin*r,     0).color(red, green, blue, alpha);
         }
         BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
 
-    public static void drawShadow(DrawContext context, float x, float y, float width, float height, int layers) {
-        for (int i = layers; i > 0; i--) {
-            int a = (int)(55.0f * ((float)(layers - i + 1) / layers));
-            drawRoundedOutline(context, x-i, y-i, width+i*2, height+i*2,
-                10+i, new Color(0,0,0,Math.max(a,0)), 1);
-        }
+    public static void drawText(DrawContext ctx, String text, float x, float y, Color color) {
+        ctx.drawText(Fonts.get(), text, (int)x, (int)y, color.getRGB(), false);
     }
 
-    public static void drawText(DrawContext context, TextRenderer font, String text, float x, float y, Color color) {
-        context.drawText(font, text, (int) x, (int) y, color.getRGB(), false);
+    public static void drawTextShadow(DrawContext ctx, String text, float x, float y, Color color) {
+        ctx.drawText(Fonts.get(), text, (int)x, (int)y, color.getRGB(), true);
     }
 
-    public static void drawTextShadow(DrawContext context, TextRenderer font, String text, float x, float y, Color color) {
-        context.drawText(font, text, (int) x, (int) y, color.getRGB(), true);
+    public static int textWidth(String text) {
+        return Fonts.get().getWidth(text);
+    }
+
+    public static int textHeight() {
+        return Fonts.get().fontHeight;
     }
 }
