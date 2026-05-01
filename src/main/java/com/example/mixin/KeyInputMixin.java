@@ -1,6 +1,6 @@
 package com.example.mixin;
 
-import com.example.ui.menu.Menu;
+import com.example.ui.newmenu.element.Menu;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.Keyboard;
 import org.lwjgl.glfw.GLFW;
@@ -16,8 +16,6 @@ public class KeyInputMixin {
     private void onKey(long window, int key, int scancode, int action, int modifiers, CallbackInfo ci) {
         if (action == GLFW.GLFW_PRESS && key == GLFW.GLFW_KEY_RIGHT_SHIFT) {
             MinecraftClient mc = MinecraftClient.getInstance();
-
-            // ✅ вот этот кусок заменён
             if (mc.currentScreen == null) {
                 mc.setScreen(new Menu());
             } else if (mc.currentScreen instanceof Menu) {
