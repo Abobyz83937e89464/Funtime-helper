@@ -1,84 +1,112 @@
-package com.example.ui.newmenu.element;
+package com.example.util.render;
 
-import com.example.util.render.DrawHelper;
-import com.example.util.render.Fonts;
+import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.*;
+import org.joml.Matrix4f;
 
 import java.awt.Color;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
-public class CategoryElement {
+public class DrawHelper {
 
-    public enum Category {
-        COMBAT("Combat"), MOVEMENT("Movement"), RENDER("Render"),
-        PLAYER("Player"), WORLD("World"), MISC("Misc");
-
-        private final String displayName;
-        Category(String d) { this.displayName = d; }
-        public String getDisplayName() { return displayName; }
+    public static void drawRect(DrawContext context, float x, float y, float width, float height, Color color) {
+        if (width <= 0 || height <= 0) return;
+        context.fill((int) x, (int) y, (int)(x + width), (int)(y + height), color.getRGB());
     }
 
-    private Category selectedCategory = Category.COMBAT;
-    private final Map<Category, float[]> bounds = new LinkedHashMap<>();
-    private final Map<Category, Float> selAnim  = new LinkedHashMap<>();
-
-    public CategoryElement() {
-        for (Category c : Category.values())
-            selAnim.put(c, c == selectedCategory ? 1f : 0f);
+    public static void drawGradientRect(DrawContext context, float x, float y, float width, float height, Color top, Color bottom) {
+        if (width <= 0 || height <= 0) return;
+        context.fillGradient((int) x, (int) y, (int)(x + width), (int)(y + height), top.getRGB(), bottom.getRGB());
     }
 
-    public Category getSelectedCategory() { return selectedCategory; }
+    public static void drawGradientRectH(DrawContext context, float x, float y, float width, float height, Color left, Color right) {
+        Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+        BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+        buffer.vertex(matrix, x,         y + height, 0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
+        buffer.vertex(matrix, x + width, y + height, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buffer.vertex(matrix, x + width, y,          0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buffer.vertex(matrix, x,         y,          0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
+        BufferRenderer.drawWithGlobalProgram(buffer.end());
+        RenderSystem.disableBlend();
+    }
 
-    public boolean mouseClicked(double mx, double my) {
-        for (var e : bounds.entrySet()) {
-            float[] b = e.getValue();
-            if (mx >= b[0] && mx <= b[0]+b[2] && my >= b[1] && my <= b[1]+b[3]) {
-                selectedCategory = e.getKey();
-                return true;
-            }
+    public static void drawRoundedRect(DrawContext context, float x, float y, float width, float height, float radius, Color color) {
+        if (radius <= 0) { drawRect(context, x, y, width, height, color); return; }
+        drawRect(context, x + radius,         y,          width - radius * 2, height,              color);
+        drawRect(context, x,                  y + radius, radius,             height - radius * 2, color);
+        drawRect(context, x + width - radius, y + radius, radius,             height - radius * 2, color);
+        drawCircleQuarter(context, x + radius,         y + radius,          radius, 180, color);
+        drawCircleQuarter(context, x + width - radius, y + radius,          radius, 270, color);
+        drawCircleQuarter(context, x + width - radius, y + height - radius, radius, 0,   color);
+        drawCircleQuarter(context, x + radius,         y + height - radius, radius, 90,  color);
+    }
+
+    private static void drawCircleQuarter(DrawContext context, float cx, float cy, float r, float startDeg, Color color) {
+        Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+        int segments = 12;
+        float red = color.getRed()/255f, green = color.getGreen()/255f,
+              blue = color.getBlue()/255f, alpha = color.getAlpha()/255f;
+        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
+        buf.vertex(matrix, cx, cy, 0).color(red, green, blue, alpha);
+        for (int i = 0; i <= segments; i++) {
+            double angle = Math.toRadians(startDeg + 90.0 * i / segments);
+            buf.vertex(matrix, cx + (float)Math.cos(angle)*r, cy + (float)Math.sin(angle)*r, 0).color(red, green, blue, alpha);
         }
-        return false;
+        BufferRenderer.drawWithGlobalProgram(buf.end());
+        RenderSystem.disableBlend();
     }
 
-    public void render(DrawContext ctx, float fx, float fy, float fw, float fh) {
-        Category[] cats = Category.values();
-        float spacing = 6f, btnH = 24f, radius = 6f;
+    public static void drawRoundedOutline(DrawContext context, float x, float y, float width, float height, float radius, Color color, float thickness) {
+        drawRect(context, x + radius,            y,                      width - radius * 2, thickness,           color);
+        drawRect(context, x + radius,            y + height - thickness, width - radius * 2, thickness,           color);
+        drawRect(context, x,                     y + radius,             thickness,          height - radius * 2, color);
+        drawRect(context, x + width - thickness, y + radius,             thickness,          height - radius * 2, color);
+        drawArcOutline(context, x + radius,         y + radius,          radius, 180, color, thickness);
+        drawArcOutline(context, x + width - radius, y + radius,          radius, 270, color, thickness);
+        drawArcOutline(context, x + width - radius, y + height - radius, radius, 0,   color, thickness);
+        drawArcOutline(context, x + radius,         y + height - radius, radius, 90,  color, thickness);
+    }
 
-        float totalW = 0;
-        for (Category c : cats)
-            totalW += Fonts.getMedium().getWidth(c.getDisplayName()) + 24 + spacing;
-        totalW -= spacing;
-
-        float curX = fx + (fw - totalW) / 2f;
-        float btnY = fy + (fh - btnH) / 2f;
-        bounds.clear();
-
-        for (Category cat : cats) {
-            float anim = selAnim.getOrDefault(cat, 0f);
-            anim += ((cat == selectedCategory ? 1f : 0f) - anim) * 0.15f;
-            selAnim.put(cat, anim);
-
-            float btnW = Fonts.getMedium().getWidth(cat.getDisplayName()) + 24;
-
-            Color bg = new Color((int)(28+23*anim), (int)(29+27*anim), (int)(38+56*anim), 255);
-            DrawHelper.drawRoundedRect(ctx, curX, btnY, btnW, btnH, radius, bg);
-
-            if (anim > 0.02f) {
-                DrawHelper.drawRoundedOutline(ctx, curX, btnY, btnW, btnH, radius,
-                    new Color(75, 80, 140, (int)(255*anim)), 1);
-                float lw = btnW * 0.6f * anim;
-                DrawHelper.drawRoundedRect(ctx, curX + (btnW-lw)/2f, btnY+btnH-2, lw, 2, 1,
-                    new Color(125, 136, 255, (int)(255*anim)));
-            }
-
-            Color tc = new Color((int)(110+87*anim), (int)(114+86*anim), (int)(160+95*anim), 255);
-            float tx = curX + (btnW - Fonts.getMedium().getWidth(cat.getDisplayName())) / 2f;
-            float ty = btnY + (btnH - Fonts.getMedium().fontHeight) / 2f;
-            DrawHelper.drawText(ctx, Fonts.getMedium(), cat.getDisplayName(), tx, ty, tc);
-
-            bounds.put(cat, new float[]{curX, btnY, btnW, btnH});
-            curX += btnW + spacing;
+    private static void drawArcOutline(DrawContext context, float cx, float cy, float r, float startDeg, Color color, float thickness) {
+        Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+        int segments = 12;
+        float red = color.getRed()/255f, green = color.getGreen()/255f,
+              blue = color.getBlue()/255f, alpha = color.getAlpha()/255f;
+        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
+        for (int i = 0; i <= segments; i++) {
+            double angle = Math.toRadians(startDeg + 90.0 * i / segments);
+            float cos = (float)Math.cos(angle), sin = (float)Math.sin(angle);
+            buf.vertex(matrix, cx+cos*(r-thickness), cy+sin*(r-thickness), 0).color(red, green, blue, alpha);
+            buf.vertex(matrix, cx+cos*r,             cy+sin*r,             0).color(red, green, blue, alpha);
         }
+        BufferRenderer.drawWithGlobalProgram(buf.end());
+        RenderSystem.disableBlend();
+    }
+
+    public static void drawShadow(DrawContext context, float x, float y, float width, float height, int layers) {
+        for (int i = layers; i > 0; i--) {
+            int a = (int)(55.0f * ((float)(layers - i + 1) / layers));
+            drawRoundedOutline(context, x-i, y-i, width+i*2, height+i*2,
+                10+i, new Color(0,0,0,Math.max(a,0)), 1);
+        }
+    }
+
+    public static void drawText(DrawContext context, TextRenderer font, String text, float x, float y, Color color) {
+        context.drawText(font, text, (int) x, (int) y, color.getRGB(), false);
+    }
+
+    public static void drawTextShadow(DrawContext context, TextRenderer font, String text, float x, float y, Color color) {
+        context.drawText(font, text, (int) x, (int) y, color.getRGB(), true);
     }
 }
