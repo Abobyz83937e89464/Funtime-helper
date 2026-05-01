@@ -3,113 +3,126 @@ package com.example.util.render;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.*;
-import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 
 import java.awt.Color;
 
 public class DrawHelper {
 
-    // ─── Базовые прямоугольники ───────────────────────────────────────────────
-
-    public static void drawRect(DrawContext context, int x, int y, int width, int height, Color color) {
-        if (width <= 0 || height <= 0) return;
-        context.fill(x, y, x + width, y + height, color.getRGB());
-    }
-
     public static void drawRect(DrawContext context, float x, float y, float width, float height, Color color) {
-        drawRect(context, (int) x, (int) y, (int) width, (int) height, color);
-    }
-
-    // ─── Outline ────────────────────────────────────────────────────────────
-
-    public static void drawOutlineRect(DrawContext context, int x, int y, int width, int height, Color color, int thickness) {
-        drawRect(context, x, y, width, thickness, color);
-        drawRect(context, x, y + height - thickness, width, thickness, color);
-        drawRect(context, x, y, thickness, height, color);
-        drawRect(context, x + width - thickness, y, thickness, height, color);
-    }
-
-    public static void drawOutlineRect(DrawContext context, float x, float y, float width, float height, Color color, int thickness) {
-        drawOutlineRect(context, (int) x, (int) y, (int) width, (int) height, color, thickness);
-    }
-
-    // ─── Градиент ────────────────────────────────────────────────────────────
-
-    public static void drawGradientRect(DrawContext context, int x, int y, int width, int height, Color colorTop, Color colorBottom) {
         if (width <= 0 || height <= 0) return;
-        context.fillGradient(x, y, x + width, y + height, colorTop.getRGB(), colorBottom.getRGB());
+        context.fill((int) x, (int) y, (int)(x + width), (int)(y + height), color.getRGB());
     }
 
-    // ─── Горизонтальный градиент ─────────────────────────────────────────────
-
-    public static void drawGradientRectH(DrawContext context, int x, int y, int width, int height, Color colorLeft, Color colorRight) {
+    public static void drawGradientRect(DrawContext context, float x, float y, float width, float height, Color top, Color bottom) {
         if (width <= 0 || height <= 0) return;
+        context.fillGradient((int) x, (int) y, (int)(x + width), (int)(y + height), top.getRGB(), bottom.getRGB());
+    }
 
-        MatrixStack matrixStack = context.getMatrices();
-        Matrix4f matrix = matrixStack.peek().getPositionMatrix();
-
+    public static void drawGradientRectH(DrawContext context, float x, float y, float width, float height, Color left, Color right) {
+        Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
 
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder buffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-
-        int cl = colorLeft.getRGB();
-        int cr = colorRight.getRGB();
-
-        buffer.vertex(matrix, x,         y + height, 0).color(cl);
-        buffer.vertex(matrix, x + width, y + height, 0).color(cr);
-        buffer.vertex(matrix, x + width, y,          0).color(cr);
-        buffer.vertex(matrix, x,         y,          0).color(cl);
-
+        BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+        buffer.vertex(matrix, x, y + height, 0).color(left.getRed(), left.getGreen(), left.getBlue(), left.getAlpha());
+        buffer.vertex(matrix, x + width, y + height, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buffer.vertex(matrix, x + width, y, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buffer.vertex(matrix, x, y, 0).color(left.getRed(), left.getGreen(), left.getBlue(), left.getAlpha());
         BufferRenderer.drawWithGlobalProgram(buffer.end());
         RenderSystem.disableBlend();
     }
 
-    // ─── Тень ────────────────────────────────────────────────────────────────
-
-    public static void drawShadow(DrawContext context, int x, int y, int width, int height, int shadowSize) {
-        for (int i = 0; i < shadowSize; i++) {
-            int alpha = (int) (50 * (1.0f - (float) i / shadowSize));
-            Color shadowColor = new Color(0, 0, 0, Math.max(alpha, 0));
-            drawOutlineRect(context, x - i - 1, y - i - 1,
-                    width + (i + 1) * 2, height + (i + 1) * 2, shadowColor, 1);
-        }
-    }
-
-    // ─── Скруглённые углы (простая имитация через несколько rect) ────────────
-
-    public static void drawRoundedRect(DrawContext context, int x, int y, int width, int height, int radius, Color color) {
-        // Центральные полосы
+    public static void drawRoundedRect(DrawContext context, float x, float y, float width, float height, float radius, Color color) {
+        if (radius <= 0) { drawRect(context, x, y, width, height, color); return; }
         drawRect(context, x + radius, y, width - radius * 2, height, color);
         drawRect(context, x, y + radius, radius, height - radius * 2, color);
         drawRect(context, x + width - radius, y + radius, radius, height - radius * 2, color);
-        // Заполняем углы кругами (приближение квадратами по кольцам)
-        for (int dx = 0; dx < radius; dx++) {
-            for (int dy = 0; dy < radius; dy++) {
-                double dist = Math.sqrt((radius - dx - 0.5) * (radius - dx - 0.5) + (radius - dy - 0.5) * (radius - dy - 0.5));
-                if (dist <= radius) {
-                    // Верхний левый
-                    drawRect(context, x + dx, y + dy, 1, 1, color);
-                    // Верхний правый
-                    drawRect(context, x + width - 1 - dx, y + dy, 1, 1, color);
-                    // Нижний левый
-                    drawRect(context, x + dx, y + height - 1 - dy, 1, 1, color);
-                    // Нижний правый
-                    drawRect(context, x + width - 1 - dx, y + height - 1 - dy, 1, 1, color);
-                }
-            }
+        drawCircleQuarter(context, x + radius,         y + radius,          radius, 180, color);
+        drawCircleQuarter(context, x + width - radius, y + radius,          radius, 270, color);
+        drawCircleQuarter(context, x + width - radius, y + height - radius, radius, 0,   color);
+        drawCircleQuarter(context, x + radius,         y + height - radius, radius, 90,  color);
+    }
+
+    private static void drawCircleQuarter(DrawContext context, float cx, float cy, float r, float startDeg, Color color) {
+        Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+
+        int segments = 12;
+        float red   = color.getRed()   / 255f;
+        float green = color.getGreen() / 255f;
+        float blue  = color.getBlue()  / 255f;
+        float alpha = color.getAlpha() / 255f;
+
+        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
+        buf.vertex(matrix, cx, cy, 0).color(red, green, blue, alpha);
+        for (int i = 0; i <= segments; i++) {
+            double angle = Math.toRadians(startDeg + 90.0 * i / segments);
+            buf.vertex(matrix,
+                    cx + (float) Math.cos(angle) * r,
+                    cy + (float) Math.sin(angle) * r,
+                    0).color(red, green, blue, alpha);
+        }
+        BufferRenderer.drawWithGlobalProgram(buf.end());
+        RenderSystem.disableBlend();
+    }
+
+    public static void drawRoundedOutline(DrawContext context, float x, float y, float width, float height, float radius, Color color, float thickness) {
+        // Top
+        drawRect(context, x + radius, y, width - radius * 2, thickness, color);
+        // Bottom
+        drawRect(context, x + radius, y + height - thickness, width - radius * 2, thickness, color);
+        // Left
+        drawRect(context, x, y + radius, thickness, height - radius * 2, color);
+        // Right
+        drawRect(context, x + width - thickness, y + radius, thickness, height - radius * 2, color);
+        // Corners
+        drawArcOutline(context, x + radius,         y + radius,          radius, 180, color, thickness);
+        drawArcOutline(context, x + width - radius, y + radius,          radius, 270, color, thickness);
+        drawArcOutline(context, x + width - radius, y + height - radius, radius, 0,   color, thickness);
+        drawArcOutline(context, x + radius,         y + height - radius, radius, 90,  color, thickness);
+    }
+
+    private static void drawArcOutline(DrawContext context, float cx, float cy, float r, float startDeg, Color color, float thickness) {
+        Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+
+        int segments = 12;
+        float red   = color.getRed()   / 255f;
+        float green = color.getGreen() / 255f;
+        float blue  = color.getBlue()  / 255f;
+        float alpha = color.getAlpha() / 255f;
+
+        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
+        for (int i = 0; i <= segments; i++) {
+            double angle = Math.toRadians(startDeg + 90.0 * i / segments);
+            float cos = (float) Math.cos(angle);
+            float sin = (float) Math.sin(angle);
+            buf.vertex(matrix, cx + cos * (r - thickness), cy + sin * (r - thickness), 0).color(red, green, blue, alpha);
+            buf.vertex(matrix, cx + cos * r,               cy + sin * r,               0).color(red, green, blue, alpha);
+        }
+        BufferRenderer.drawWithGlobalProgram(buf.end());
+        RenderSystem.disableBlend();
+    }
+
+    public static void drawShadow(DrawContext context, float x, float y, float width, float height, int layers) {
+        for (int i = layers; i > 0; i--) {
+            int a = (int)(55.0f * ((float)(layers - i + 1) / layers));
+            Color c = new Color(0, 0, 0, Math.max(a, 0));
+            drawRoundedOutline(context, x - i, y - i, width + i * 2, height + i * 2, 10 + i, c, 1);
         }
     }
 
-    // ─── Акцентная полоска (горизонтальная с градиентом) ─────────────────────
+    public static void drawText(DrawContext context, net.minecraft.client.font.TextRenderer font, String text, float x, float y, Color color) {
+        context.drawText(font, text, (int) x, (int) y, color.getRGB(), false);
+    }
 
-    public static void drawAccentBar(DrawContext context, int x, int y, int width, int height) {
-        drawGradientRectH(context, x, y, width / 2, height,
-                new Color(80, 100, 255, 200), new Color(125, 136, 255, 200));
-        drawGradientRectH(context, x + width / 2, y, width / 2, height,
-                new Color(125, 136, 255, 200), new Color(80, 100, 255, 0));
+    public static void drawTextShadow(DrawContext context, net.minecraft.client.font.TextRenderer font, String text, float x, float y, Color color) {
+        context.drawText(font, text, (int) x, (int) y, color.getRGB(), true);
     }
 }
