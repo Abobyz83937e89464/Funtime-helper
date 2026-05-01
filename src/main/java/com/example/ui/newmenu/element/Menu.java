@@ -1,7 +1,6 @@
 package com.example.ui.newmenu.element;
 
 import com.example.util.render.DrawHelper;
-import com.example.util.render.Fonts;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -13,193 +12,161 @@ import java.util.List;
 
 public class Menu extends Screen {
 
-    private final CategoryElement categoryElement;
-    private final ModuleElement   moduleElement;
+    // Размер меню
+    private static final int W  = 480;
+    private static final int H  = 290;
+    private static final int SW = 80;  // ширина sidebar
+    private static final float PAD = 6f;
+    private static final int COLS = 2;
 
-    private float scrollOffset = 0f, scrollTarget = 0f, maxScroll = 0f, openAnim = 0f;
-
-    private static final int MENU_W = 860, MENU_H = 440, HEAD_H = 42, FOOT_H = 40;
-    private static final int COLS = 4;
-    private static final float PAD = 10f;
-
+    private final CategoryElement catEl = new CategoryElement();
+    private final ModuleElement   modEl = new ModuleElement();
     private final List<ModuleEntry> modules = new ArrayList<>();
+
+    private float openAnim = 0f;
+    private float scrollOffset = 0f, scrollTarget = 0f, maxScroll = 0f;
 
     public Menu() {
         super(Text.of("Nocturn"));
-        categoryElement = new CategoryElement();
-        moduleElement   = new ModuleElement();
         loadModules();
     }
 
     private void loadModules() {
         modules.clear();
-        switch (categoryElement.getSelectedCategory()) {
-            case COMBAT   -> fill("KillAura","Velocity","AutoTotem","Criticals","Reach","AimAssist","AutoPot","AntiBot","Backtrack","HitBox","TriggerBot","AntiKnock");
-            case MOVEMENT -> fill("Speed","Fly","Sprint","NoSlow","Step","Strafe","LongJump","Blink");
-            case RENDER   -> fill("ESP","Tracers","NameTags","Fullbright","NoRender","ChestESP","HUD","CameraClip");
-            case PLAYER   -> fill("AutoArmor","ChestStealer","FastPlace","NoFall","Scaffold","AutoEat");
-            case WORLD    -> fill("Timer","Nuker","AutoMine","Fucker");
-            case MISC     -> fill("AutoFish","Disabler","Spammer","MiddleClick","AntiAFK");
+        switch (catEl.getSelected()) {
+            case COMBAT   -> add("KillAura","Velocity","AutoTotem","Criticals","Reach","AimAssist","AutoPot","AntiBot","Backtrack","HitBox","TriggerBot","AntiKnock");
+            case MOVEMENT -> add("Speed","Fly","Sprint","NoSlow","Step","Strafe","LongJump","Blink");
+            case RENDER   -> add("ESP","Tracers","NameTags","Fullbright","NoRender","ChestESP","HUD","CameraClip");
+            case PLAYER   -> add("AutoArmor","ChestStealer","FastPlace","NoFall","Scaffold","AutoEat");
+            case WORLD    -> add("Timer","Nuker","AutoMine","Fucker");
+            case MISC     -> add("AutoFish","Disabler","Spammer","MiddleClick","AntiAFK");
         }
         scrollOffset = 0; scrollTarget = 0;
-        updateMaxScroll();
+        recalcScroll();
     }
 
-    private void fill(String... names) {
+    private void add(String... names) {
         for (String n : names) modules.add(new ModuleEntry(n, false));
     }
 
-    private void updateMaxScroll() {
-        int rows = (int) Math.ceil((double) modules.size() / COLS);
-        float contentH = rows * (moduleElement.getHeight() + PAD) + PAD;
-        maxScroll = Math.max(0, contentH - MENU_H);
+    private void recalcScroll() {
+        int rows = (int)Math.ceil((double)modules.size() / COLS);
+        float contentH = rows * (ModuleElement.CARD_H + PAD) + PAD;
+        float visibleH = H - 26; // минус header
+        maxScroll = Math.max(0, contentH - visibleH);
     }
 
-    private float menuX() { return (MinecraftClient.getInstance().getWindow().getScaledWidth()  - MENU_W) / 2f; }
-    private float menuY() { return (MinecraftClient.getInstance().getWindow().getScaledHeight() - MENU_H) / 2f; }
-    private float cardW() { return (MENU_W - PAD * (COLS + 1)) / COLS; }
+    private float x() { return (MinecraftClient.getInstance().getWindow().getScaledWidth()  - W) / 2f; }
+    private float y() { return (MinecraftClient.getInstance().getWindow().getScaledHeight() - H) / 2f; }
+    private float cardW() { return (W - SW - PAD*(COLS+1)) / COLS; }
 
     @Override
     public void tick() {
-        super.tick();
-        openAnim     += (1f - openAnim)                * 0.12f;
-        scrollOffset += (scrollTarget - scrollOffset)  * 0.18f;
+        openAnim     += (1f - openAnim) * 0.14f;
+        scrollOffset += (scrollTarget - scrollOffset) * 0.2f;
     }
 
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        float mx = menuX(), my = menuY();
-        float totalH = HEAD_H + MENU_H + FOOT_H;
+        float x = x(), y = y();
+        int a = (int)(255 * openAnim);
 
-        // Затемнение фона
+        // Тёмный оверлей
         DrawHelper.drawRect(ctx, 0, 0,
             MinecraftClient.getInstance().getWindow().getScaledWidth(),
             MinecraftClient.getInstance().getWindow().getScaledHeight(),
-            new Color(0, 0, 0, (int)(130 * openAnim)));
+            new Color(0, 0, 0, (int)(100*openAnim)));
 
-        // Анимация открытия
-        float scale = 0.88f + openAnim * 0.12f;
-        float cx = mx + MENU_W / 2f, cy = my + MENU_H / 2f;
+        // Анимация масштаба
+        float scale = 0.9f + openAnim*0.1f;
         ctx.getMatrices().push();
-        ctx.getMatrices().translate(cx, cy, 0);
+        ctx.getMatrices().translate(x+W/2f, y+H/2f, 0);
         ctx.getMatrices().scale(scale, scale, 1);
-        ctx.getMatrices().translate(-cx, -cy, 0);
+        ctx.getMatrices().translate(-(x+W/2f), -(y+H/2f), 0);
 
-        // Тень
-        DrawHelper.drawShadow(ctx, mx, my - HEAD_H, MENU_W, totalH, 10);
+        // === Основной фон ===
+        DrawHelper.drawRoundedRect(ctx, x, y, W, H, 8, new Color(18, 19, 28, a));
+        DrawHelper.drawOutline(ctx, x, y, W, H, 8, new Color(45, 47, 68, a));
 
-        // Header
-        DrawHelper.drawRoundedRect(ctx, mx, my - HEAD_H, MENU_W, HEAD_H, 12,
-            new Color(22, 24, 34, (int)(255*openAnim)));
-        DrawHelper.drawGradientRectH(ctx, mx, my - HEAD_H, MENU_W * 0.3f, HEAD_H,
-            new Color(51, 56, 94, (int)(70*openAnim)), new Color(22, 24, 34, 0));
-        renderHeader(ctx, mx, my - HEAD_H);
+        // === Header (26px) ===
+        DrawHelper.drawRoundedRect(ctx, x, y, W, 26, 8, new Color(22, 23, 35, a));
+        DrawHelper.drawRect(ctx, x, y+20, W, 6, new Color(22, 23, 35, a)); // скругление только сверху
+        DrawHelper.drawRect(ctx, x, y+25, W, 1, new Color(38, 40, 60, a));
+        DrawHelper.drawGradientH(ctx, x, y, W*0.25f, 26,
+            new Color(50, 55, 100, (int)(50*openAnim)), new Color(18,19,28,0));
 
-        // Разделитель header/content
-        DrawHelper.drawRect(ctx, mx, my - 1, MENU_W, 1, new Color(40, 42, 60, (int)(255*openAnim)));
+        // Логотип
+        DrawHelper.drawTextShadow(ctx, "Nocturn", x+10, y+8, new Color(190, 195, 255, a));
+        int nw = DrawHelper.textWidth("Nocturn");
+        DrawHelper.drawText(ctx, " Client", x+10+nw, y+8, new Color(110, 120, 255, a));
 
-        // Main bg
-        DrawHelper.drawRect(ctx, mx, my, MENU_W, MENU_H, new Color(17, 19, 24, (int)(255*openAnim)));
+        // Правая часть header
+        String ver = "1.21.4  |  Fabric";
+        DrawHelper.drawText(ctx, ver, x+W-DrawHelper.textWidth(ver)-10, y+8, new Color(65, 68, 100, a));
 
-        // Content
-        renderContent(ctx, mx, my, mouseX, mouseY);
+        // === Sidebar ===
+        DrawHelper.drawRect(ctx, x, y+26, SW, H-26, new Color(14, 15, 23, a));
+        DrawHelper.drawRect(ctx, x+SW, y+26, 1, H-26, new Color(38, 40, 60, a));
+        catEl.render(ctx, x, y+26, SW, H-26);
 
-        // Разделитель content/footer
-        DrawHelper.drawRect(ctx, mx, my + MENU_H, MENU_W, 1, new Color(40, 42, 60, (int)(255*openAnim)));
+        // === Content area ===
+        float cx = x+SW+1, cy = y+26;
+        float cw = W-SW-1, ch = H-26;
 
-        // Footer
-        DrawHelper.drawRoundedRect(ctx, mx, my + MENU_H + 1, MENU_W, FOOT_H - 1, 12,
-            new Color(22, 24, 34, (int)(255*openAnim)));
-        categoryElement.render(ctx, mx, my + MENU_H + 1, MENU_W, FOOT_H - 1);
+        ctx.enableScissor((int)cx, (int)cy, (int)(cx+cw), (int)(cy+ch));
 
-        // Общий outline
-        DrawHelper.drawRoundedOutline(ctx, mx-1, my-HEAD_H-1, MENU_W+2, totalH+2, 12,
-            new Color(52, 51, 64, (int)(255*openAnim)), 1);
-
-        ctx.getMatrices().pop();
-    }
-
-    private void renderHeader(DrawContext ctx, float x, float y) {
-        int a = (int)(255 * openAnim);
-
-        float ty = y + (HEAD_H - Fonts.getBold().fontHeight) / 2f;
-
-        // Логотип слева
-        DrawHelper.drawTextShadow(ctx, Fonts.getBold(), "Nocturn",
-            x + 16, ty, new Color(197, 200, 255, a));
-        DrawHelper.drawText(ctx, Fonts.getRegular(), " Client",
-            x + 16 + Fonts.getBold().getWidth("Nocturn"), ty, new Color(125, 136, 255, a));
-
-        // Версия справа
-        String ver = "v1.0  |  1.21.4";
-        DrawHelper.drawText(ctx, Fonts.getRegular(), ver,
-            x + MENU_W - Fonts.getRegular().getWidth(ver) - 16, ty,
-            new Color(80, 84, 120, a));
-
-        // Категория по центру
-        String cat = categoryElement.getSelectedCategory().getDisplayName();
-        DrawHelper.drawText(ctx, Fonts.getRegular(), cat,
-            x + (MENU_W - Fonts.getRegular().getWidth(cat)) / 2f, ty,
-            new Color(141, 144, 199, a));
-
-        // Точка под категорией
-        DrawHelper.drawRoundedRect(ctx, x + MENU_W/2f - 2, y + HEAD_H - 4, 4, 3, 1,
-            new Color(125, 136, 255, (int)(180*openAnim)));
-    }
-
-    private void renderContent(DrawContext ctx, float x, float y, int mouseX, int mouseY) {
-        float cw = cardW(), ch = moduleElement.getHeight();
-        ctx.enableScissor((int)x, (int)y, (int)(x+MENU_W), (int)(y+MENU_H));
-
-        float startY = y + PAD + scrollOffset;
+        float cardW = cardW();
+        float startY = cy + PAD + scrollOffset;
         for (int i = 0; i < modules.size(); i++) {
             int col = i % COLS, row = i / COLS;
-            float cx2 = x + PAD + col * (cw + PAD);
-            float cy2 = startY + row * (ch + PAD);
-            if (cy2 + ch < y || cy2 > y + MENU_H) continue;
-            moduleElement.render(ctx, cx2, cy2, cw, modules.get(i), mouseX, mouseY);
+            float mx2 = cx + PAD + col*(cardW+PAD);
+            float my2 = startY + row*(ModuleElement.CARD_H+PAD);
+            if (my2 + ModuleElement.CARD_H < cy || my2 > cy+ch) continue;
+            modEl.render(ctx, mx2, my2, cardW, modules.get(i), mouseX, mouseY);
         }
 
         ctx.disableScissor();
 
-        // Fade сверху и снизу
-        DrawHelper.drawGradientRect(ctx, x, y, MENU_W, 18,
-            new Color(17,19,24,(int)(220*openAnim)), new Color(17,19,24,0));
-        DrawHelper.drawGradientRect(ctx, x, y+MENU_H-18, MENU_W, 18,
-            new Color(17,19,24,0), new Color(17,19,24,(int)(220*openAnim)));
+        // Fade сверху/снизу
+        DrawHelper.drawGradientV(ctx, cx, cy, cw, 12,
+            new Color(18,19,28,a), new Color(18,19,28,0));
+        DrawHelper.drawGradientV(ctx, cx, cy+ch-12, cw, 12,
+            new Color(18,19,28,0), new Color(18,19,28,a));
 
         // Scrollbar
         if (maxScroll > 0) {
-            float trackH = MENU_H - 8;
-            float thumbH = Math.max(30, trackH * MENU_H / (MENU_H + maxScroll));
-            float prog   = scrollOffset / -maxScroll;
-            float thumbY = y + 4 + prog * (trackH - thumbH);
-            DrawHelper.drawRoundedRect(ctx, x+MENU_W-4, y+4, 3, trackH, 2,
-                new Color(28,30,42));
-            DrawHelper.drawRoundedRect(ctx, x+MENU_W-4, thumbY, 3, thumbH, 2,
-                new Color(125,136,255,200));
+            float trackH = ch-8;
+            float thumbH = Math.max(20, trackH*ch/(ch+maxScroll));
+            float prog = (maxScroll > 0) ? scrollOffset / -maxScroll : 0;
+            float thumbY = cy+4 + prog*(trackH-thumbH);
+            DrawHelper.drawRoundedRect(ctx, cx+cw-4, cy+4, 3, trackH, 2, new Color(28,30,45,a));
+            DrawHelper.drawRoundedRect(ctx, cx+cw-4, thumbY, 3, thumbH, 2, new Color(100,120,255,a));
         }
+
+        ctx.getMatrices().pop();
+
+        super.render(ctx, mouseX, mouseY, delta);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        float x = menuX(), y = menuY();
+        float x = x(), y = y();
 
-        // Footer — категории
-        if (mouseY >= y+MENU_H+1 && mouseY <= y+MENU_H+FOOT_H) {
-            if (categoryElement.mouseClicked(mouseX, mouseY)) { loadModules(); return true; }
+        // Sidebar клик
+        if (mouseX >= x && mouseX <= x+SW && mouseY >= y+26 && mouseY <= y+H) {
+            if (catEl.click(mouseX, mouseY)) { loadModules(); return true; }
         }
 
-        // Content — модули
-        if (mouseY >= y && mouseY <= y+MENU_H) {
-            float cw = cardW(), ch = moduleElement.getHeight();
-            float startY = y + PAD + scrollOffset;
-            for (int i = 0; i < modules.size(); i++) {
-                int col = i%COLS, row = i/COLS;
-                float cx2 = x+PAD+col*(cw+PAD), cy2 = startY+row*(ch+PAD);
-                if (mouseX>=cx2&&mouseX<=cx2+cw&&mouseY>=cy2&&mouseY<=cy2+ch) {
-                    if (button==0) { modules.get(i).enabled = !modules.get(i).enabled; return true; }
-                }
+        // Модули клик
+        float cx = x+SW+1, cy = y+26;
+        float cardW = cardW();
+        float startY = cy + PAD + scrollOffset;
+        for (int i = 0; i < modules.size(); i++) {
+            int col = i%COLS, row = i/COLS;
+            float mx2 = cx+PAD+col*(cardW+PAD);
+            float my2 = startY+row*(ModuleElement.CARD_H+PAD);
+            if (mouseX>=mx2&&mouseX<=mx2+cardW&&mouseY>=my2&&mouseY<=my2+ModuleElement.CARD_H) {
+                if (button==0) { modules.get(i).enabled = !modules.get(i).enabled; return true; }
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -207,9 +174,9 @@ public class Menu extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double h, double v) {
-        float x = menuX(), y = menuY();
-        if (mouseX>=x && mouseX<=x+MENU_W && mouseY>=y && mouseY<=y+MENU_H) {
-            scrollTarget = Math.max(-maxScroll, Math.min(0, scrollTarget+(float)(v*22)));
+        float x = x(), y = y();
+        if (mouseX>=x+SW&&mouseX<=x+W&&mouseY>=y+26&&mouseY<=y+H) {
+            scrollTarget = Math.max(-maxScroll, Math.min(0, scrollTarget+(float)(v*18)));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, h, v);
@@ -217,7 +184,7 @@ public class Menu extends Screen {
 
     @Override
     public boolean keyPressed(int key, int scan, int mods) {
-        if (key == 256) { close(); return true; }
+        if (key==256) { close(); return true; }
         return super.keyPressed(key, scan, mods);
     }
 
@@ -226,9 +193,6 @@ public class Menu extends Screen {
     public static class ModuleEntry {
         public String name;
         public boolean enabled;
-        public ModuleEntry(String name, boolean enabled) {
-            this.name = name;
-            this.enabled = enabled;
-        }
+        public ModuleEntry(String n, boolean e) { name=n; enabled=e; }
     }
 }
