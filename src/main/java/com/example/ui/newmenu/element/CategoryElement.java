@@ -1,8 +1,7 @@
-package com.example.ui.menu.element;
+package com.example.ui.newmenu.element;
 
 import com.example.util.render.DrawHelper;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
+import com.example.util.render.Fonts;
 import net.minecraft.client.gui.DrawContext;
 
 import java.awt.Color;
@@ -11,122 +10,99 @@ import java.util.Map;
 
 public class CategoryElement {
 
-    // ─── Категории ───────────────────────────────────────────────────────────
-
     public enum Category {
-        COMBAT  ("Combat",   "⚔"),
-        MOVEMENT("Movement", "➤"),
-        RENDER  ("Render",   "◈"),
-        PLAYER  ("Player",   "♟"),
-        WORLD   ("World",    "◉"),
-        MISC    ("Misc",     "⚙");
+        COMBAT("Combat"),
+        MOVEMENT("Movement"),
+        RENDER("Render"),
+        PLAYER("Player"),
+        WORLD("World"),
+        MISC("Misc");
 
         private final String displayName;
-        private final String icon;
-
-        Category(String displayName, String icon) {
-            this.displayName = displayName;
-            this.icon = icon;
-        }
-
+        Category(String d) { this.displayName = d; }
         public String getDisplayName() { return displayName; }
-        public String getIcon()        { return icon; }
     }
-
-    // ─── Состояние ───────────────────────────────────────────────────────────
 
     private Category selectedCategory = Category.COMBAT;
-    private final Map<Category, int[]> categoryBounds = new LinkedHashMap<>();
-
-    // Плавная анимация выделения (простой lerp)
-    private final Map<Category, Float> selectionAnim = new LinkedHashMap<>();
+    private final Map<Category, float[]> bounds = new LinkedHashMap<>();
+    private final Map<Category, Float> selAnim  = new LinkedHashMap<>();
 
     public CategoryElement() {
-        for (Category c : Category.values()) {
-            selectionAnim.put(c, c == selectedCategory ? 1f : 0f);
-        }
+        for (Category c : Category.values())
+            selAnim.put(c, c == selectedCategory ? 1f : 0f);
     }
-
-    // ─── API ─────────────────────────────────────────────────────────────────
 
     public Category getSelectedCategory() { return selectedCategory; }
 
-    public boolean mouseClicked(double mouseX, double mouseY) {
-        for (Map.Entry<Category, int[]> entry : categoryBounds.entrySet()) {
-            int[] b = entry.getValue();
-            if (mouseX >= b[0] && mouseX <= b[0] + b[2] &&
-                mouseY >= b[1] && mouseY <= b[1] + b[3]) {
-                selectedCategory = entry.getKey();
+    public boolean mouseClicked(double mx, double my) {
+        for (var e : bounds.entrySet()) {
+            float[] b = e.getValue();
+            if (mx >= b[0] && mx <= b[0]+b[2] && my >= b[1] && my <= b[1]+b[3]) {
+                selectedCategory = e.getKey();
                 return true;
             }
         }
         return false;
     }
 
-    // ─── Рендер футера ───────────────────────────────────────────────────────
-
-    public void render(DrawContext context, int footerX, int footerY, int footerWidth, int footerHeight) {
-        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
+    public void render(DrawContext ctx, float fx, float fy, float fw, float fh) {
         Category[] cats = Category.values();
+        float spacing = 6f;
+        float btnH = 24f;
+        float radius = 6f;
 
-        // === Цвета ===
-        Color selectedText  = new Color(197, 200, 255);
-        Color normalText    = new Color(100, 104, 150);
-        Color selectedBg    = new Color(38, 40, 62);
-        Color selectedLine  = new Color(125, 136, 255);
+        float totalW = 0;
+        for (Category c : cats)
+            totalW += Fonts.MEDIUM.getWidth(c.getDisplayName()) + 24 + spacing;
+        totalW -= spacing;
 
-        // Считаем суммарную ширину для центрирования
-        int spacing = 18;
-        int totalWidth = 0;
-        for (Category c : cats) {
-            totalWidth += tr.getWidth(c.getDisplayName()) + 20; // padding по 10 с каждой стороны
-        }
-        totalWidth += spacing * (cats.length - 1);
+        float curX = fx + (fw - totalW) / 2f;
+        float btnY  = fy + (fh - btnH) / 2f;
 
-        int startX = footerX + (footerWidth - totalWidth) / 2;
-        int btnH = footerHeight - 8;
-        int btnY = footerY + 4;
+        bounds.clear();
 
-        categoryBounds.clear();
-
-        int cx = startX;
         for (Category cat : cats) {
-            // Анимация lerp
-            float target = (cat == selectedCategory) ? 1f : 0f;
-            float cur = selectionAnim.getOrDefault(cat, 0f);
-            float next = cur + (target - cur) * 0.2f;
-            selectionAnim.put(cat, next);
+            float anim = selAnim.getOrDefault(cat, 0f);
+            float target = cat == selectedCategory ? 1f : 0f;
+            anim += (target - anim) * 0.15f;
+            selAnim.put(cat, anim);
 
-            int nameW = tr.getWidth(cat.getDisplayName());
-            int btnW = nameW + 20;
+            float btnW = Fonts.MEDIUM.getWidth(cat.getDisplayName()) + 24;
 
-            // Фон кнопки
-            if (next > 0.01f) {
-                int bgAlpha = (int) (next * 255);
-                DrawHelper.drawRoundedRect(context, cx, btnY, btnW, btnH, 4,
-                        new Color(selectedBg.getRed(), selectedBg.getGreen(), selectedBg.getBlue(), bgAlpha));
+            // Фон
+            Color bg = new Color(
+                (int)(28 + 23 * anim),
+                (int)(29 + 27 * anim),
+                (int)(38 + 56 * anim), 255);
+            DrawHelper.drawRoundedRect(ctx, curX, btnY, btnW, btnH, radius, bg);
+
+            // Outline
+            if (anim > 0.02f) {
+                Color ol = new Color(75, 80, 140, (int)(255 * anim));
+                DrawHelper.drawRoundedOutline(ctx, curX, btnY, btnW, btnH, radius, ol, 1);
+            }
+
+            // Акцентная линия снизу
+            if (anim > 0.02f) {
+                float lw = btnW * 0.6f * anim;
+                DrawHelper.drawRoundedRect(ctx,
+                    curX + (btnW - lw) / 2f,
+                    btnY + btnH - 2,
+                    lw, 2, 1,
+                    new Color(125, 136, 255, (int)(255 * anim)));
             }
 
             // Текст
-            int r = blend(normalText.getRed(),   selectedText.getRed(),   next);
-            int g = blend(normalText.getGreen(), selectedText.getGreen(), next);
-            int b = blend(normalText.getBlue(),  selectedText.getBlue(),  next);
-            context.drawText(tr, cat.getDisplayName(), cx + 10, btnY + (btnH - 8) / 2, new Color(r, g, b).getRGB(), false);
+            Color tc = new Color(
+                (int)(110 + 87 * anim),
+                (int)(114 + 86 * anim),
+                (int)(160 + 95 * anim), 255);
+            float tx = curX + (btnW - Fonts.MEDIUM.getWidth(cat.getDisplayName())) / 2f;
+            float ty = btnY + (btnH - Fonts.MEDIUM.fontHeight) / 2f;
+            DrawHelper.drawText(ctx, Fonts.MEDIUM, cat.getDisplayName(), tx, ty, tc);
 
-            // Нижняя линия-акцент для выбранного
-            if (next > 0.01f) {
-                int lineAlpha = (int) (next * 255);
-                DrawHelper.drawAccentBar(context,
-                        cx, btnY + btnH - 2,
-                        btnW, 2);
-            }
-
-            categoryBounds.put(cat, new int[]{cx, btnY, btnW, btnH});
-            cx += btnW + spacing;
+            bounds.put(cat, new float[]{curX, btnY, btnW, btnH});
+            curX += btnW + spacing;
         }
-    }
-
-    private int blend(int a, int b, float t) {
-        return (int) (a + (b - a) * t);
     }
 }
