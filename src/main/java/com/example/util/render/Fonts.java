@@ -5,15 +5,22 @@ import net.minecraft.client.font.TextRenderer;
 
 public class Fonts {
 
-    public static TextRenderer BOLD;
-    public static TextRenderer MEDIUM;
-    public static TextRenderer REGULAR;
+    private static TextRenderer _bold;
+    private static TextRenderer _medium;
+    private static TextRenderer _regular;
 
-    public static void init() {
-        // В 1.21.4 getFontManager() убран, используем стандартный textRenderer
-        // Кастомные шрифты через json грузятся автоматически через fontRenderer по Identifier
-        BOLD    = MinecraftClient.getInstance().textRenderer;
-        MEDIUM  = MinecraftClient.getInstance().textRenderer;
-        REGULAR = MinecraftClient.getInstance().textRenderer;
+    public static TextRenderer getBold() {
+        if (_bold == null) _bold = MinecraftClient.getInstance().textRenderer;
+        return _bold;
+    }
+
+    public static TextRenderer getMedium() {
+        if (_medium == null) _medium = MinecraftClient.getInstance().textRenderer;
+        return _medium;
+    }
+
+    public static TextRenderer getRegular() {
+        if (_regular == null) _regular = MinecraftClient.getInstance().textRenderer;
+        return _regular;
     }
 }
