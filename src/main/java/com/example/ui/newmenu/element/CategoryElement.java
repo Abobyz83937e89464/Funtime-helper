@@ -31,8 +31,9 @@ public class CategoryElement {
     public boolean click(double mx, double my) {
         for (var e : bounds.entrySet()) {
             float[] b = e.getValue();
-            if (mx>=b[0]&&mx<=b[0]+b[2]&&my>=b[1]&&my<=b[1]+b[3]) {
-                selected = e.getKey(); return true;
+            if (mx>=b[0] && mx<=b[0]+b[2] && my>=b[1] && my<=b[1]+b[3]) {
+                selected = e.getKey();
+                return true;
             }
         }
         return false;
@@ -41,38 +42,61 @@ public class CategoryElement {
     public void render(DrawContext ctx, float x, float y, float w, float h) {
         bounds.clear();
         Category[] cats = Category.values();
-        float itemH = 20f, pad = 4f;
-        float startY = y + 8f;
+        float itemH = 22f, pad = 4f;
+        float totalListH = cats.length * itemH + (cats.length-1) * pad;
+        float startY = y + (h - totalListH) / 2f;
 
         for (int i = 0; i < cats.length; i++) {
             Category cat = cats[i];
             float iy = startY + i*(itemH+pad);
 
             float anim = anims.getOrDefault(cat, 0f);
-            anim += ((cat==selected?1f:0f)-anim)*0.15f;
+            anim += ((cat==selected ? 1f : 0f) - anim) * 0.15f;
             anims.put(cat, anim);
 
-            // Фон кнопки — сильно скруглённый
-            Color bg = new Color((int)(27+22*anim),(int)(29+26*anim),(int)(44+52*anim),255);
-            DrawHelper.drawRoundedRect(ctx, x+6, iy, w-12, itemH, itemH/2f, bg);
+            float bx = x + 5f;
+            float bw = w - 10f;
+            float radius = itemH / 2f; // капсула — полностью круглые края
+
+            // Фон кнопки
+            Color bg = new Color(
+                (int)(26 + 24*anim),
+                (int)(28 + 27*anim),
+                (int)(43 + 54*anim), 255);
+            DrawHelper.drawRoundedRect(ctx, bx, iy, bw, itemH, radius, bg);
+
+            // Gradient overlay при выборе
+            if (anim > 0.02f) {
+                DrawHelper.drawGradientH(ctx, bx, iy, bw * 0.5f, itemH,
+                    new Color(60, 70, 180, (int)(30*anim)),
+                    new Color(60, 70, 180, 0));
+            }
 
             // Outline при выборе
-            if (anim > 0.05f)
-                DrawHelper.drawOutline(ctx, x+6, iy, w-12, itemH, itemH/2f,
-                    new Color(80,100,230,(int)(120*anim)));
+            if (anim > 0.02f) {
+                DrawHelper.drawOutline(ctx, bx, iy, bw, itemH, radius,
+                    new Color(80, 100, 230, (int)(110*anim)));
+            }
 
-            // Акцент слева
-            if (anim > 0.05f)
-                DrawHelper.drawRoundedRect(ctx, x+6, iy+(itemH-8)/2f, 2, 8, 1,
-                    new Color(110,130,255,(int)(255*anim)));
+            // Акцентная точка слева
+            if (anim > 0.02f) {
+                float dotSize = 4f;
+                DrawHelper.drawRoundedRect(ctx,
+                    bx + 6, iy + (itemH - dotSize)/2f,
+                    dotSize, dotSize, dotSize/2f,
+                    new Color(110, 130, 255, (int)(255*anim)));
+            }
 
-            // Текст по центру
-            Color tc = new Color((int)(120+115*anim),(int)(125+110*anim),(int)(168+75*anim),255);
-            float tx = x+6 + (w-12-DrawHelper.tw(cat.getName()))/2f;
-            float ty = iy + (itemH - DrawHelper.th())/2f;
-            DrawHelper.text(ctx, cat.getName(), tx, ty, tc);
+            // Текст по центру кнопки
+            float tx = bx + (bw - DrawHelper.twMed(cat.getName())) / 2f;
+            float ty = iy + (itemH - DrawHelper.thMed()) / 2f;
+            Color tc = new Color(
+                (int)(115 + 120*anim),
+                (int)(120 + 115*anim),
+                (int)(165 + 78*anim), 255);
+            DrawHelper.textMed(ctx, cat.getName(), tx, ty, tc);
 
-            bounds.put(cat, new float[]{x+6, iy, w-12, itemH});
+            bounds.put(cat, new float[]{bx, iy, bw, itemH});
         }
     }
 }
