@@ -14,12 +14,11 @@ public class ModuleElement {
     private final Map<String, Float> hoverAnims  = new HashMap<>();
     private final Map<String, Float> toggleAnims = new HashMap<>();
 
-    // Меньше чем было (52 -> 44)
-    public static final float BASE_H = 44f;
+    public static final float BASE_H = 40f;
 
     public float getHeight() { return BASE_H; }
 
-    public static float getModuleWidth() { return 100f; }
+    public static float getModuleWidth() { return 96f; }
 
     public void render(DrawContext ctx, float x, float y, Menu.ModuleEntry mod, double mx, double my) {
         float w = getModuleWidth();
@@ -28,7 +27,7 @@ public class ModuleElement {
         // Hover анимация
         boolean hovered = mx >= x && mx <= x + w && my >= y && my <= y + BASE_H;
         float ha = hoverAnims.getOrDefault(mod.name, 0f);
-        ha += ((hovered ? 1f : 0f) - ha) * 0.15f;
+        ha += ((hovered ? 1f : 0f) - ha) * 0.14f;
         hoverAnims.put(mod.name, ha);
 
         // Toggle анимация
@@ -36,65 +35,77 @@ public class ModuleElement {
         ta += ((mod.enabled ? 1f : 0f) - ta) * 0.12f;
         toggleAnims.put(mod.name, ta);
 
-        // Название модуля (Inter Bold, над панелью)
-        Color nameColor = new Color(
-            (int)(127 + 70 * ta),
-            (int)(133 + 67 * ta),
-            (int)(172 + 83 * ta), 255);
-        DrawHelper.drawText(ctx, mod.name, x, y, nameColor);
+        float radius = 6f;
 
-        float rectY = y + Fonts.height() + 3;
-        float rectH = BASE_H - Fonts.height() - 3;
+        // Фон карточки модуля
+        Color bgBase  = new Color(22, 23, 32);
+        Color bgActive = new Color(28, 30, 45);
+        int bgR = (int)(bgBase.getRed()   + (bgActive.getRed()   - bgBase.getRed())   * ta);
+        int bgG = (int)(bgBase.getGreen() + (bgActive.getGreen() - bgBase.getGreen()) * ta);
+        int bgB = (int)(bgBase.getBlue()  + (bgActive.getBlue()  - bgBase.getBlue())  * ta);
+        DrawHelper.drawRect(ms.peek().getPositionMatrix(), x, y, w, BASE_H, radius, new Color(bgR, bgG, bgB));
 
-        // Фон панели
-        DrawHelper.drawRect(ms.peek().getPositionMatrix(), x, rectY, w, rectH, 5,
-            new Color(28, 29, 38));
+        // Hover overlay
+        if (ha > 0.01f)
+            DrawHelper.drawRect(ms.peek().getPositionMatrix(), x, y, w, BASE_H, radius,
+                new Color(255, 255, 255, (int)(8 * ha)));
 
-        // Цветной оверлей если включён
-        if (ta > 0.01f) {
-            DrawHelper.drawRect(ms.peek().getPositionMatrix(), x, rectY, w, rectH, 5,
-                new Color(51, 56, 94, (int)(25 * ta)));
-        }
-
-        // Outline панели
-        DrawHelper.drawOutline(ms, x - 1, rectY - 1, w + 2, rectH + 2, 5,
-            new Color(33, 32, 43), 2);
+        // Outline карточки
+        Color outlineCol = new Color(
+            (int)(38 + 30 * ta),
+            (int)(37 + 35 * ta),
+            (int)(52 + 50 * ta));
+        DrawHelper.drawOutline(ms, x - 1, y - 1, w + 2, BASE_H + 2, radius,
+            outlineCol, 1);
 
         // Акцент сверху если включён (фиолетовая линия)
         if (ta > 0.01f) {
-            float lw = (w - 10) * ta;
+            float lw = (w - radius * 2) * ta;
             DrawHelper.drawRect(ms.peek().getPositionMatrix(),
-                x + 5, rectY, lw, 2, 1,
-                new Color(125, 136, 255, (int)(200 * ta)));
+                x + radius, y, lw, 2, 1,
+                new Color(110, 120, 255, (int)(210 * ta)));
+            // Glow под линией
+            DrawHelper.drawRect(ms.peek().getPositionMatrix(),
+                x + radius, y + 2, lw, 3, 0,
+                new Color(100, 110, 255, (int)(40 * ta)));
         }
 
-        // Тоггл (переключатель справа, в центре по вертикали)
-        float tw = 24f, th = 12f;
-        float tx = x + w - tw - 6;
-        float ty = rectY + (rectH - th) / 2f;
+        // Название модуля (Inter Bold)
+        Color nameColor = new Color(
+            (int)(150 + 47 * ta),
+            (int)(155 + 45 * ta),
+            (int)(195 + 60 * ta));
+        DrawHelper.drawText(ctx, mod.name, x + 6, y + 6, nameColor);
+
+        // Тоггл переключатель
+        float tw = 22f, th = 11f;
+        float tx = x + w - tw - 5;
+        float ty = y + BASE_H - th - 6;
+
         Color tbg = new Color(
-            (int)(21 + 40 * ta),
-            (int)(22 + 45 * ta),
-            (int)(29 + 65 * ta), 255);
+            (int)(18 + 35 * ta),
+            (int)(20 + 38 * ta),
+            (int)(28 + 60 * ta));
         DrawHelper.drawRect(ms.peek().getPositionMatrix(), tx, ty, tw, th, th / 2f, tbg);
-        DrawHelper.drawOutline(ms, tx, ty, tw, th, th / 2f, new Color(33, 32, 43), 1);
+        DrawHelper.drawOutline(ms, tx - 1, ty - 1, tw + 2, th + 2, th / 2f + 1,
+            new Color(38, 37, 52), 1);
 
         float cs = th - 4f;
         float kx  = tx + 2 + ta * (tw - cs - 4);
         DrawHelper.drawRect(ms.peek().getPositionMatrix(), kx, ty + 2, cs, cs, cs / 2f,
-            new Color((int)(80 + 45 * ta), (int)(90 + 46 * ta), (int)(150 + 105 * ta), 255));
+            new Color((int)(70 + 55 * ta), (int)(80 + 50 * ta), (int)(140 + 115 * ta)));
 
-        // Hover outline
-        if (ha > 0.02f)
-            DrawHelper.drawOutline(ms, x, rectY, w, rectH, 5,
-                new Color(70, 80, 200, (int)(40 * ha)), 1);
+        // Статус текст
+        String status = mod.enabled ? "ON" : "OFF";
+        Color statusC = mod.enabled
+            ? new Color(100, 200, 130, (int)(160 + 95 * ta))
+            : new Color(90, 90, 120);
+        DrawHelper.drawTextMedium(ctx, status, x + 6, ty + (th - Fonts.height()) / 2f, statusC);
     }
 
     public boolean mouseClicked(float x, float y, Menu.ModuleEntry mod, double mx, double my, int button) {
-        float w    = getModuleWidth();
-        float rectY = y + Fonts.height() + 3;
-        float rectH = BASE_H - Fonts.height() - 3;
-        if (button == 0 && mx >= x && mx <= x + w && my >= rectY && my <= rectY + rectH) {
+        float w = getModuleWidth();
+        if (button == 0 && mx >= x && mx <= x + w && my >= y && my <= y + BASE_H) {
             mod.enabled = !mod.enabled;
             return true;
         }
