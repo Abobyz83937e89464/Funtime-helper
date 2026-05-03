@@ -8,9 +8,10 @@ import net.minecraft.util.Identifier;
 
 public class Fonts {
 
-    public static final Identifier BOLD    = Identifier.of("modid", "inter_bold");
-    public static final Identifier MEDIUM  = Identifier.of("modid", "inter_medium");
-    public static final Identifier REGULAR = Identifier.of("modid", "inter_regular");
+    // ИЗМЕНЕНО: вместо "modid" теперь "nocturn-client"
+    public static final Identifier BOLD    = Identifier.of("nocturn-client", "inter_bold");
+    public static final Identifier MEDIUM  = Identifier.of("nocturn-client", "inter_medium");
+    public static final Identifier REGULAR = Identifier.of("nocturn-client", "inter_regular");
 
     public static TextRenderer renderer() {
         return MinecraftClient.getInstance().textRenderer;
