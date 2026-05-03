@@ -4,7 +4,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 
 public class Fonts {
-
     public static TextRenderer get() {
         return MinecraftClient.getInstance().textRenderer;
     }
