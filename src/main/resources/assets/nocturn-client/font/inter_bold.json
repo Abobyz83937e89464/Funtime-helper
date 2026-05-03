@@ -2,7 +2,7 @@
   "providers": [
     {
       "type": "ttf",
-      "file": "nocturn-client:inter-bold.ttf",
+      "file": "nocturn-client:inter_bold.ttf",
       "shift": [0, -1],
       "size": 11,
       "oversample": 8
