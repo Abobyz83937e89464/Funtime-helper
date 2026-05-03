@@ -9,66 +9,51 @@ import java.util.Map;
 
 public class ModuleElement {
 
-    private final Map<String, Float> hoverAnim  = new HashMap<>();
-    private final Map<String, Float> toggleAnim = new HashMap<>();
-
-    public static final float CARD_H = 40f;
+    public static final float H = 40f;
+    private final Map<String, Float> hov = new HashMap<>();
+    private final Map<String, Float> tog = new HashMap<>();
 
     public void render(DrawContext ctx, float x, float y, float w, Menu.ModuleEntry mod, double mx, double my) {
-        boolean hovered = mx>=x && mx<=x+w && my>=y && my<=y+CARD_H;
+        boolean hovered = mx>=x&&mx<=x+w&&my>=y&&my<=y+H;
 
-        float ha = hoverAnim.getOrDefault(mod.name, 0f);
-        ha += ((hovered ? 1f : 0f) - ha) * 0.18f;
-        hoverAnim.put(mod.name, ha);
+        float ha = hov.getOrDefault(mod.name, 0f);
+        ha += ((hovered?1f:0f)-ha)*0.18f;
+        hov.put(mod.name, ha);
 
-        float ta = toggleAnim.getOrDefault(mod.name, mod.enabled ? 1f : 0f);
-        ta += ((mod.enabled ? 1f : 0f) - ta) * 0.14f;
-        toggleAnim.put(mod.name, ta);
+        float ta = tog.getOrDefault(mod.name, mod.enabled?1f:0f);
+        ta += ((mod.enabled?1f:0f)-ta)*0.14f;
+        tog.put(mod.name, ta);
 
-        // Фон карточки
-        Color bg = new Color(
-            (int)(24 + 8*ha + 5*ta),
-            (int)(26 + 8*ha + 5*ta),
-            (int)(38 + 8*ha + 10*ta), 255);
-        DrawHelper.drawRoundedRect(ctx, x, y, w, CARD_H, 5, bg);
+        // Фон
+        Color bg = new Color((int)(22+7*ha+4*ta),(int)(24+7*ha+4*ta),(int)(36+7*ha+9*ta),255);
+        DrawHelper.drawRoundedRect(ctx, x, y, w, H, 6, bg);
 
-        // Верхняя линия если включён
+        // Полоска сверху если включён
         if (ta > 0.05f) {
-            float lw = (w-10) * ta;
-            DrawHelper.drawRoundedRect(ctx, x+5, y, lw, 1, 0,
-                new Color(100, 120, 255, (int)(200*ta)));
+            float lw = (w-8)*ta;
+            DrawHelper.drawRoundedRect(ctx, x+4, y, lw, 1, 0, new Color(95,115,255,(int)(200*ta)));
         }
 
         // Outline
-        Color ol = new Color(
-            (int)(38 + 30*ta + 10*ha),
-            (int)(40 + 35*ta + 10*ha),
-            (int)(58 + 80*ta + 10*ha), 255);
-        DrawHelper.drawOutline(ctx, x, y, w, CARD_H, 5, ol);
+        Color ol = new Color((int)(35+28*ta+7*ha),(int)(37+33*ta+7*ha),(int)(53+80*ta+7*ha),255);
+        DrawHelper.drawOutline(ctx, x, y, w, H, 6, ol);
 
-        // Название модуля
-        Color nameC = new Color(
-            (int)(170 + 85*ta),
-            (int)(175 + 80*ta),
-            (int)(210 + 45*ta), 255);
-        DrawHelper.drawTextShadow(ctx, mod.name, x+8, y+7, nameC);
+        // Название модуля — крупный шрифт
+        Color nc = new Color((int)(160+80*ta),(int)(165+75*ta),(int)(200+48*ta),255);
+        DrawHelper.textBig(ctx, mod.name, x+7, y+5, nc);
 
-        // Статус
-        String status = mod.enabled ? "ON" : "OFF";
-        Color statusC = mod.enabled
-            ? new Color(100, 220, 130, (int)(200+55*ta))
-            : new Color(80, 83, 110);
-        DrawHelper.drawText(ctx, status, x+8, y+7+DrawHelper.textHeight()+3, statusC);
+        // Статус — мелкий
+        Color sc = mod.enabled ? new Color(90,205,120,(int)(185+70*ta)) : new Color(72,75,108);
+        DrawHelper.text(ctx, mod.enabled ? "ON" : "OFF", x+8, y+5+DrawHelper.thBig()+2, sc);
 
-        // Тоггл-переключатель
-        float tw = 22f, th = 11f;
-        float tx = x+w-tw-6, ty2 = y+(CARD_H-th)/2f;
-        Color tbg = new Color((int)(20+40*ta), (int)(20+45*ta), (int)(30+90*ta), 255);
-        DrawHelper.drawRoundedRect(ctx, tx, ty2, tw, th, th/2f, tbg);
-        DrawHelper.drawOutline(ctx, tx, ty2, tw, th, th/2f, ol);
-        float cs = th-3;
-        float kcx = tx+1.5f + ta*(tw-cs-3);
-        DrawHelper.drawRoundedRect(ctx, kcx, ty2+1.5f, cs, cs, cs/2f,
-            new Color((int)(90+60*ta),(int)(100+60*ta),(int)(160+95*ta), 255));
+        // Тоггл
+        float tw=20f, th=10f;
+        float tx=x+w-tw-5, ty=y+(H-th)/2f;
+        DrawHelper.drawRoundedRect(ctx, tx, ty, tw, th, th/2f,
+            new Color((int)(17+36*ta),(int)(17+40*ta),(int)(25+86*ta),255));
+        DrawHelper.drawOutline(ctx, tx, ty, tw, th, th/2f, ol);
+        float cs=th-3, kcx=tx+1.5f+ta*(tw-cs-3);
+        DrawHelper.drawRoundedRect(ctx, kcx, ty+1.5f, cs, cs, cs/2f,
+            new Color((int)(82+56*ta),(int)(92+55*ta),(int)(152+90*ta),255));
     }
 }
