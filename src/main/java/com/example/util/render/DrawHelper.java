@@ -26,10 +26,10 @@ public class DrawHelper {
         RenderSystem.enableBlend(); RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
         BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-        buf.vertex(m,x,   y+h,0).color(left.getRed(), left.getGreen(), left.getBlue(), left.getAlpha());
-        buf.vertex(m,x+w, y+h,0).color(right.getRed(),right.getGreen(),right.getBlue(),right.getAlpha());
-        buf.vertex(m,x+w, y,  0).color(right.getRed(),right.getGreen(),right.getBlue(),right.getAlpha());
-        buf.vertex(m,x,   y,  0).color(left.getRed(), left.getGreen(), left.getBlue(), left.getAlpha());
+        buf.vertex(m, x,   y+h, 0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
+        buf.vertex(m, x+w, y+h, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buf.vertex(m, x+w, y,   0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buf.vertex(m, x,   y,   0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
         BufferRenderer.drawWithGlobalProgram(buf.end()); RenderSystem.disableBlend();
     }
 
@@ -48,10 +48,14 @@ public class DrawHelper {
         Matrix4f m = ctx.getMatrices().peek().getPositionMatrix();
         RenderSystem.enableBlend(); RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float red=color.getRed()/255f,g=color.getGreen()/255f,b=color.getBlue()/255f,a=color.getAlpha()/255f;
+        float red = color.getRed()/255f, g = color.getGreen()/255f,
+              b   = color.getBlue()/255f, a = color.getAlpha()/255f;
         BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
-        buf.vertex(m,cx,cy,0).color(red,g,b,a);
-        for(int i=0;i<=12;i++){double angle=Math.toRadians(deg+90.0*i/12);buf.vertex(m,cx+(float)Math.cos(angle)*r,cy+(float)Math.sin(angle)*r,0).color(red,g,b,a);}
+        buf.vertex(m, cx, cy, 0).color(red, g, b, a);
+        for (int i = 0; i <= 12; i++) {
+            double angle = Math.toRadians(deg + 90.0*i/12);
+            buf.vertex(m, cx+(float)Math.cos(angle)*r, cy+(float)Math.sin(angle)*r, 0).color(red,g,b,a);
+        }
         BufferRenderer.drawWithGlobalProgram(buf.end()); RenderSystem.disableBlend();
     }
 
@@ -70,43 +74,63 @@ public class DrawHelper {
         Matrix4f m = ctx.getMatrices().peek().getPositionMatrix();
         RenderSystem.enableBlend(); RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float red=color.getRed()/255f,g=color.getGreen()/255f,b=color.getBlue()/255f,a=color.getAlpha()/255f;
+        float red = color.getRed()/255f, g = color.getGreen()/255f,
+              b   = color.getBlue()/255f, a = color.getAlpha()/255f;
         BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
-        for(int i=0;i<=12;i++){double angle=Math.toRadians(deg+90.0*i/12);float cos=(float)Math.cos(angle),sin=(float)Math.sin(angle);buf.vertex(m,cx+cos*(r-1),cy+sin*(r-1),0).color(red,g,b,a);buf.vertex(m,cx+cos*r,cy+sin*r,0).color(red,g,b,a);}
+        for (int i = 0; i <= 12; i++) {
+            double angle = Math.toRadians(deg + 90.0*i/12);
+            float cos = (float)Math.cos(angle), sin = (float)Math.sin(angle);
+            buf.vertex(m, cx+cos*(r-1), cy+sin*(r-1), 0).color(red,g,b,a);
+            buf.vertex(m, cx+cos*r,     cy+sin*r,     0).color(red,g,b,a);
+        }
         BufferRenderer.drawWithGlobalProgram(buf.end()); RenderSystem.disableBlend();
     }
 
-    // Обычный текст (0.9x — чуть компактнее)
+    // ── Текст через scale матрицы ──────────────────────────────
+
+    /** Мелкий текст — статусы, версия (0.85x) */
     public static void text(DrawContext ctx, String t, float x, float y, Color c) {
         ctx.getMatrices().push();
         ctx.getMatrices().translate(x, y, 0);
-        ctx.getMatrices().scale(0.9f, 0.9f, 1f);
+        ctx.getMatrices().scale(0.85f, 0.85f, 1f);
         ctx.drawText(Fonts.get(), t, 0, 0, c.getRGB(), false);
         ctx.getMatrices().pop();
     }
 
-    // Текст с тенью — крупнее (1.1x — для заголовков)
-    public static void textShadow(DrawContext ctx, String t, float x, float y, Color c) {
+    /** Средний текст с тенью — категории, обычные надписи (1.0x) */
+    public static void textMed(DrawContext ctx, String t, float x, float y, Color c) {
         ctx.getMatrices().push();
         ctx.getMatrices().translate(x, y, 0);
-        ctx.getMatrices().scale(1.1f, 1.1f, 1f);
+        ctx.getMatrices().scale(1.0f, 1.0f, 1f);
         ctx.drawText(Fonts.get(), t, 0, 0, c.getRGB(), true);
         ctx.getMatrices().pop();
     }
 
-    // Крупный жирный текст (1.3x — лого и названия модулей)
+    /** Крупный жирный с тенью — названия модулей, лого (1.25x) */
     public static void textBig(DrawContext ctx, String t, float x, float y, Color c) {
         ctx.getMatrices().push();
         ctx.getMatrices().translate(x, y, 0);
-        ctx.getMatrices().scale(1.3f, 1.3f, 1f);
+        ctx.getMatrices().scale(1.25f, 1.25f, 1f);
         ctx.drawText(Fonts.get(), t, 0, 0, c.getRGB(), true);
         ctx.getMatrices().pop();
     }
 
-    // Ширина с учётом scale
-    public static int tw(String t)     { return (int)(Fonts.get().getWidth(t) * 0.9f); }
-    public static int twBig(String t)  { return (int)(Fonts.get().getWidth(t) * 1.3f); }
-    public static int twHdr(String t)  { return (int)(Fonts.get().getWidth(t) * 1.1f); }
-    public static int th()             { return (int)(Fonts.get().fontHeight   * 0.9f); }
-    public static int thBig()          { return (int)(Fonts.get().fontHeight   * 1.3f); }
+    /** Очень крупный — заголовок меню (1.5x) */
+    public static void textHuge(DrawContext ctx, String t, float x, float y, Color c) {
+        ctx.getMatrices().push();
+        ctx.getMatrices().translate(x, y, 0);
+        ctx.getMatrices().scale(1.5f, 1.5f, 1f);
+        ctx.drawText(Fonts.get(), t, 0, 0, c.getRGB(), true);
+        ctx.getMatrices().pop();
+    }
+
+    // ── Размеры с учётом scale ─────────────────────────────────
+    public static float tw(String t)     { return Fonts.get().getWidth(t) * 0.85f; }
+    public static float twMed(String t)  { return Fonts.get().getWidth(t) * 1.0f;  }
+    public static float twBig(String t)  { return Fonts.get().getWidth(t) * 1.25f; }
+    public static float twHuge(String t) { return Fonts.get().getWidth(t) * 1.5f;  }
+    public static float th()             { return Fonts.get().fontHeight   * 0.85f; }
+    public static float thMed()          { return Fonts.get().fontHeight   * 1.0f;  }
+    public static float thBig()          { return Fonts.get().fontHeight   * 1.25f; }
+    public static float thHuge()         { return Fonts.get().fontHeight   * 1.5f;  }
 }
