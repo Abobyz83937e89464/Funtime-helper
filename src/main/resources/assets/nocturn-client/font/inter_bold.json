@@ -2,7 +2,7 @@
   "providers": [
     {
       "type": "ttf",
-      "file": "modid:font/inter-bold.ttf",
+      "file": "nocturn-client:font/inter-bold.ttf",
       "shift": [0, -1],
       "size": 11,
       "oversample": 8
