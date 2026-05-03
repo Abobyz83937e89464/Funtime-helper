@@ -6,7 +6,6 @@ import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.text.Text;
 import org.joml.Matrix4f;
 
 import java.awt.Color;
@@ -14,7 +13,7 @@ import java.awt.Color;
 public class DrawHelper {
 
     // ─────────────────────────────────────────────────────────────
-    //  RECT (скруглённый)
+    //  RECT
     // ─────────────────────────────────────────────────────────────
 
     public static void drawRect(MatrixStack ms, float x, float y, float w, float h, float r, Color c) {
@@ -33,10 +32,9 @@ public class DrawHelper {
         drawCorner (m, x + r,     y + h - r, r, 90,  c);
     }
 
-    // простой fill через DrawContext (без скруглений, но без создания нового контекста!)
     public static void drawRect(DrawContext ctx, float x, float y, float w, float h, Color c) {
         if (w <= 0 || h <= 0) return;
-        ctx.fill((int) x, (int) y, (int) (x + w), (int) (y + h), c.getRGB());
+        ctx.fill((int) x, (int) y, (int)(x + w), (int)(y + h), c.getRGB());
     }
 
     private static void drawRectRaw(Matrix4f m, float x, float y, float w, float h, Color c) {
@@ -44,8 +42,7 @@ public class DrawHelper {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float r = c.getRed() / 255f, g = c.getGreen() / 255f,
-              b = c.getBlue() / 255f, a = c.getAlpha() / 255f;
+        float r = c.getRed()/255f, g = c.getGreen()/255f, b = c.getBlue()/255f, a = c.getAlpha()/255f;
         BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
         buf.vertex(m, x,     y + h, 0).color(r, g, b, a);
         buf.vertex(m, x + w, y + h, 0).color(r, g, b, a);
@@ -60,35 +57,45 @@ public class DrawHelper {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float red = c.getRed() / 255f, g = c.getGreen() / 255f,
-              b   = c.getBlue() / 255f, a = c.getAlpha() / 255f;
+        float red = c.getRed()/255f, g = c.getGreen()/255f, b = c.getBlue()/255f, a = c.getAlpha()/255f;
         BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
         buf.vertex(m, cx, cy, 0).color(red, g, b, a);
-        for (int i = 0; i <= 12; i++) {
-            double angle = Math.toRadians(deg + 90.0 * i / 12);
-            buf.vertex(m, cx + (float) Math.cos(angle) * r, cy + (float) Math.sin(angle) * r, 0).color(red, g, b, a);
+        for (int i = 0; i <= 16; i++) {
+            double angle = Math.toRadians(deg + 90.0 * i / 16);
+            buf.vertex(m, cx + (float)Math.cos(angle) * r, cy + (float)Math.sin(angle) * r, 0).color(red, g, b, a);
         }
         BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
 
     // ─────────────────────────────────────────────────────────────
-    //  STYLED RECT (разные радиусы углов: tl, tr, br, bl)
+    //  SHADOW — имитация тени через слои с затуханием
+    // ─────────────────────────────────────────────────────────────
+
+    public static void drawShadow(MatrixStack ms, float x, float y, float w, float h, float radius, float spread, Color color) {
+        Matrix4f m = ms.peek().getPositionMatrix();
+        int steps = 12;
+        for (int i = steps; i >= 1; i--) {
+            float t      = (float) i / steps;
+            float expand = spread * t;
+            float alpha  = color.getAlpha() * (1f - t) * (1f - t);
+            Color c = new Color(color.getRed(), color.getGreen(), color.getBlue(), (int) Math.min(255, alpha));
+            drawRect(m, x - expand, y - expand, w + expand * 2, h + expand * 2, radius + expand, c);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  STYLED RECT (разные радиусы углов)
     // ─────────────────────────────────────────────────────────────
 
     public static void drawStyledRect(Matrix4f m, float x, float y, float w, float h,
                                       float tl, float tr, float br, float bl, Color c) {
-        // центр
-        drawRectRaw(m, x + tl, y + tl, w - tl - tr, h - tl - bl, c);
-        // верхняя полоса без углов
-        if (tl + tr < w) drawRectRaw(m, x + tl, y, w - tl - tr, Math.max(tl, tr), c);
-        // нижняя полоса
-        if (bl + br < w) drawRectRaw(m, x + bl, y + h - Math.max(bl, br), w - bl - br, Math.max(bl, br), c);
-        // левая полоса
-        if (tl + bl < h) drawRectRaw(m, x, y + tl, Math.max(tl, bl), h - tl - bl, c);
-        // правая полоса
-        if (tr + br < h) drawRectRaw(m, x + w - Math.max(tr, br), y + tr, Math.max(tr, br), h - tr - br, c);
-        // углы
+        float maxT = Math.max(tl, tr);
+        float maxB = Math.max(bl, br);
+        drawRectRaw(m, x + tl,     y,          w - tl - tr, h,            c);
+        drawRectRaw(m, x,          y + tl,     tl,          h - tl - bl,  c);
+        drawRectRaw(m, x + w - tr, y + tr,     tr,          h - tr - br,  c);
+        drawRectRaw(m, x + bl,     y + h - bl, w - bl - br, bl,           c);
         if (tl > 0) drawCorner(m, x + tl,     y + tl,     tl, 180, c);
         if (tr > 0) drawCorner(m, x + w - tr, y + tr,     tr, 270, c);
         if (br > 0) drawCorner(m, x + w - br, y + h - br, br, 0,   c);
@@ -104,8 +111,8 @@ public class DrawHelper {
         Matrix4f m = ms.peek().getPositionMatrix();
         for (float t = 0; t < thickness; t++) {
             float alpha = c.getAlpha() * (1f - t / thickness);
-            Color col = new Color(c.getRed(), c.getGreen(), c.getBlue(), (int) alpha);
-            drawOutlineRaw(m, x - t, y - t, w + t * 2, h + t * 2, r + t, col);
+            drawOutlineRaw(m, x - t, y - t, w + t * 2, h + t * 2, r + t,
+                new Color(c.getRed(), c.getGreen(), c.getBlue(), (int) alpha));
         }
     }
 
@@ -125,12 +132,11 @@ public class DrawHelper {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float red = c.getRed() / 255f, g = c.getGreen() / 255f,
-              b   = c.getBlue() / 255f, a = c.getAlpha() / 255f;
+        float red = c.getRed()/255f, g = c.getGreen()/255f, b = c.getBlue()/255f, a = c.getAlpha()/255f;
         BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
-        for (int i = 0; i <= 12; i++) {
-            double angle = Math.toRadians(deg + 90.0 * i / 12);
-            float cos = (float) Math.cos(angle), sin = (float) Math.sin(angle);
+        for (int i = 0; i <= 16; i++) {
+            double angle = Math.toRadians(deg + 90.0 * i / 16);
+            float cos = (float)Math.cos(angle), sin = (float)Math.sin(angle);
             buf.vertex(m, cx + cos * (r - 1), cy + sin * (r - 1), 0).color(red, g, b, a);
             buf.vertex(m, cx + cos * r,       cy + sin * r,       0).color(red, g, b, a);
         }
@@ -143,7 +149,7 @@ public class DrawHelper {
     // ─────────────────────────────────────────────────────────────
 
     public static void drawGradientV(DrawContext ctx, float x, float y, float w, float h, Color top, Color bottom) {
-        ctx.fillGradient((int) x, (int) y, (int) (x + w), (int) (y + h), top.getRGB(), bottom.getRGB());
+        ctx.fillGradient((int) x, (int) y, (int)(x + w), (int)(y + h), top.getRGB(), bottom.getRGB());
     }
 
     public static void drawGradientH(Matrix4f m, float x, float y, float w, float h, Color left, Color right) {
@@ -167,52 +173,47 @@ public class DrawHelper {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float red = c.getRed() / 255f, g = c.getGreen() / 255f,
-              b   = c.getBlue() / 255f, a = c.getAlpha() / 255f;
+        float red = c.getRed()/255f, g = c.getGreen()/255f, b = c.getBlue()/255f, a = c.getAlpha()/255f;
         BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
         buf.vertex(m, cx, cy, 0).color(red, g, b, a);
         for (int i = 0; i <= segments; i++) {
             double angle = Math.toRadians(360.0 * i / segments);
-            buf.vertex(m, cx + (float) Math.cos(angle) * r, cy + (float) Math.sin(angle) * r, 0).color(red, g, b, a);
+            buf.vertex(m, cx + (float)Math.cos(angle) * r, cy + (float)Math.sin(angle) * r, 0).color(red, g, b, a);
         }
         BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
 
     // ─────────────────────────────────────────────────────────────
-    //  TEXT — через кастомные шрифты (Fonts.bold/medium/regular)
+    //  TEXT
     // ─────────────────────────────────────────────────────────────
 
-    /** Рисует текст через Inter Bold */
     public static void drawText(DrawContext ctx, String text, float x, float y, Color c) {
         ctx.drawText(Fonts.renderer(), Fonts.bold(text), (int) x, (int) y, c.getRGB(), false);
     }
 
-    /** Рисует текст с тенью через Inter Bold */
     public static void drawTextShadow(DrawContext ctx, String text, float x, float y, Color c) {
         ctx.drawText(Fonts.renderer(), Fonts.bold(text), (int) x, (int) y, c.getRGB(), true);
     }
 
-    /** Рисует текст через Inter Medium */
     public static void drawTextMedium(DrawContext ctx, String text, float x, float y, Color c) {
         ctx.drawText(Fonts.renderer(), Fonts.medium(text), (int) x, (int) y, c.getRGB(), false);
     }
 
-    /** Рисует текст через Inter Regular */
+    public static void drawTextMediumShadow(DrawContext ctx, String text, float x, float y, Color c) {
+        ctx.drawText(Fonts.renderer(), Fonts.medium(text), (int) x, (int) y, c.getRGB(), true);
+    }
+
     public static void drawTextRegular(DrawContext ctx, String text, float x, float y, Color c) {
         ctx.drawText(Fonts.renderer(), Fonts.regular(text), (int) x, (int) y, c.getRGB(), false);
     }
 
-    // legacy-метод для совместимости со старым кодом (MatrixStack + TextRenderer)
     public static void drawText(Matrix4f m, net.minecraft.client.font.TextRenderer font,
-                                 String text, float x, float y, Color c) {
+                                String text, float x, float y, Color c) {
         MinecraftClient mc = MinecraftClient.getInstance();
-        mc.textRenderer.draw(
-            text, x, y, c.getRGB(), false, m,
+        mc.textRenderer.draw(text, x, y, c.getRGB(), false, m,
             mc.getBufferBuilders().getEntityVertexConsumers(),
-            net.minecraft.client.font.TextRenderer.TextLayerType.NORMAL,
-            0, 0xF000F0
-        );
+            net.minecraft.client.font.TextRenderer.TextLayerType.NORMAL, 0, 0xF000F0);
         mc.getBufferBuilders().getEntityVertexConsumers().draw();
     }
 }
