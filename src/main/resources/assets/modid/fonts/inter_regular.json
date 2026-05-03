@@ -2,7 +2,7 @@
   "providers": [
     {
       "type": "ttf",
-      "file": "modid:font/Inter-Regular.ttf",
+      "file": "modid:fonts/Inter-Regular.ttf",
       "shift": [0, -1],
       "size": 11,
       "oversample": 8
