@@ -10,20 +10,15 @@ import java.util.Map;
 public class CategoryElement {
 
     public enum Category {
-        COMBAT("Combat"),
-        MOVEMENT("Movement"),
-        RENDER("Render"),
-        PLAYER("Player"),
-        WORLD("World"),
-        MISC("Misc");
-
+        COMBAT("Combat"), MOVEMENT("Move"), RENDER("Render"),
+        PLAYER("Player"), WORLD("World"), MISC("Misc");
         private final String name;
         Category(String n) { this.name = n; }
         public String getName() { return name; }
     }
 
     private Category selected = Category.COMBAT;
-    private final Map<Category, Float> anims = new LinkedHashMap<>();
+    private final Map<Category, Float>   anims  = new LinkedHashMap<>();
     private final Map<Category, float[]> bounds = new LinkedHashMap<>();
 
     public CategoryElement() {
@@ -36,52 +31,48 @@ public class CategoryElement {
     public boolean click(double mx, double my) {
         for (var e : bounds.entrySet()) {
             float[] b = e.getValue();
-            if (mx >= b[0] && mx <= b[0]+b[2] && my >= b[1] && my <= b[1]+b[3]) {
-                selected = e.getKey();
-                return true;
+            if (mx>=b[0]&&mx<=b[0]+b[2]&&my>=b[1]&&my<=b[1]+b[3]) {
+                selected = e.getKey(); return true;
             }
         }
         return false;
     }
 
-    // Рендер вертикального списка категорий (sidebar)
     public void render(DrawContext ctx, float x, float y, float w, float h) {
         bounds.clear();
         Category[] cats = Category.values();
-        float itemH = 22f, pad = 4f;
-        float startY = y + (h - (cats.length * itemH + (cats.length-1)*pad)) / 2f;
+        float itemH = 20f, pad = 4f;
+        float startY = y + 8f;
 
         for (int i = 0; i < cats.length; i++) {
             Category cat = cats[i];
             float iy = startY + i*(itemH+pad);
 
             float anim = anims.getOrDefault(cat, 0f);
-            anim += ((cat == selected ? 1f : 0f) - anim) * 0.15f;
+            anim += ((cat==selected?1f:0f)-anim)*0.15f;
             anims.put(cat, anim);
 
-            // Фон кнопки
-            Color bg = new Color(
-                (int)(30 + 25*anim),
-                (int)(32 + 28*anim),
-                (int)(48 + 52*anim), 255);
-            DrawHelper.drawRoundedRect(ctx, x+4, iy, w-8, itemH, 4, bg);
+            // Фон кнопки — сильно скруглённый
+            Color bg = new Color((int)(27+22*anim),(int)(29+26*anim),(int)(44+52*anim),255);
+            DrawHelper.drawRoundedRect(ctx, x+6, iy, w-12, itemH, itemH/2f, bg);
 
-            // Акцент слева если выбрано
-            if (anim > 0.05f) {
-                DrawHelper.drawRoundedRect(ctx, x+4, iy+(itemH-10)/2f, 2, 10, 1,
-                    new Color(120, 130, 255, (int)(255*anim)));
-            }
+            // Outline при выборе
+            if (anim > 0.05f)
+                DrawHelper.drawOutline(ctx, x+6, iy, w-12, itemH, itemH/2f,
+                    new Color(80,100,230,(int)(120*anim)));
 
-            // Текст
-            Color tc = new Color(
-                (int)(140 + 115*anim),
-                (int)(143 + 112*anim),
-                (int)(185 + 70*anim), 255);
-            float tx = x + 4 + 8;
-            float ty = iy + (itemH - DrawHelper.textHeight()) / 2f;
-            DrawHelper.drawText(ctx, cat.getName(), tx, ty, tc);
+            // Акцент слева
+            if (anim > 0.05f)
+                DrawHelper.drawRoundedRect(ctx, x+6, iy+(itemH-8)/2f, 2, 8, 1,
+                    new Color(110,130,255,(int)(255*anim)));
 
-            bounds.put(cat, new float[]{x+4, iy, w-8, itemH});
+            // Текст по центру
+            Color tc = new Color((int)(120+115*anim),(int)(125+110*anim),(int)(168+75*anim),255);
+            float tx = x+6 + (w-12-DrawHelper.tw(cat.getName()))/2f;
+            float ty = iy + (itemH - DrawHelper.th())/2f;
+            DrawHelper.text(ctx, cat.getName(), tx, ty, tc);
+
+            bounds.put(cat, new float[]{x+6, iy, w-12, itemH});
         }
     }
 }
