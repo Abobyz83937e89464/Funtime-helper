@@ -26,14 +26,11 @@ public class CategoryElement {
 
     private static Category selectedCategory = Category.COMBAT;
     private final Map<Category, float[]> categoryBounds = new HashMap<>();
-    private final Map<Category, Float> colorAnims = new HashMap<>();
-    private final Map<Category, Float> posAnims   = new HashMap<>();
+    private final Map<Category, Float>   colorAnims     = new HashMap<>();
 
     public CategoryElement() {
-        for (Category c : Category.values()) {
+        for (Category c : Category.values())
             colorAnims.put(c, c == selectedCategory ? 1f : 0f);
-            posAnims.put(c, c == selectedCategory ? 1f : 0f);
-        }
     }
 
     public Category getSelectedCategory() { return selectedCategory; }
@@ -41,13 +38,11 @@ public class CategoryElement {
     public boolean mouseClicked(double mouseX, double mouseY) {
         for (var entry : categoryBounds.entrySet()) {
             float[] b = entry.getValue();
-            if (mouseX >= b[0] && mouseX <= b[0]+b[2] && mouseY >= b[1] && mouseY <= b[1]+b[3]) {
+            if (mouseX >= b[0] && mouseX <= b[0] + b[2] && mouseY >= b[1] && mouseY <= b[1] + b[3]) {
                 if (selectedCategory != entry.getKey()) {
                     colorAnims.put(selectedCategory, 0f);
-                    posAnims.put(selectedCategory, 0f);
                     selectedCategory = entry.getKey();
                     colorAnims.put(selectedCategory, 1f);
-                    posAnims.put(selectedCategory, 1f);
                 }
                 return true;
             }
@@ -55,7 +50,6 @@ public class CategoryElement {
         return false;
     }
 
-    // Рендер футера — категории горизонтально внизу (как в оригинале)
     public void renderFooter(DrawContext ctx, float x, float y, float footerW, float footerH) {
         MatrixStack ms = ctx.getMatrices();
         categoryBounds.clear();
@@ -65,54 +59,58 @@ public class CategoryElement {
         // Считаем суммарную ширину
         int totalWidth = 0;
         for (int i = 0; i < cats.length; i++) {
-            totalWidth += Fonts.width(cats[i].getDisplayName()) + 20;
-            if (i < cats.length-1) totalWidth += 10;
+            totalWidth += Fonts.mediumWidth(cats[i].getDisplayName()) + 20;
+            if (i < cats.length - 1) totalWidth += 8;
         }
 
         float curX = x + (footerW - totalWidth) / 2f;
-        float btnH = 22f;
-        float btnY  = y + (footerH - btnH) / 2f;
+        float btnH = 20f;
+        float btnY = y + (footerH - btnH) / 2f;
 
         for (Category cat : cats) {
-            float anim = colorAnims.getOrDefault(cat, 0f);
-            anim += ((cat == selectedCategory ? 1f : 0f) - anim) * 0.18f;
+            // плавная анимация
+            float target = cat == selectedCategory ? 1f : 0f;
+            float anim   = colorAnims.getOrDefault(cat, 0f);
+            anim += (target - anim) * 0.14f;
             colorAnims.put(cat, anim);
 
-            float btnW = Fonts.width(cat.getDisplayName()) + 20;
-            float radius = btnH / 2f; // капсула — как в оригинале
+            float btnW  = Fonts.mediumWidth(cat.getDisplayName()) + 20;
+            float radius = btnH / 2f;
 
             // Фон кнопки
-            Color bg = new Color((int)(29+22*anim),(int)(31+25*anim),(int)(44+50*anim),255);
-            DrawHelper.drawRect(ms.peek().getPositionMatrix(), curX, btnY, btnW, btnH, radius, bg);
+            int bgR = (int)(29 + 22 * anim);
+            int bgG = (int)(31 + 25 * anim);
+            int bgB = (int)(44 + 50 * anim);
+            DrawHelper.drawRect(ms.peek().getPositionMatrix(), curX, btnY, btnW, btnH, radius, new Color(bgR, bgG, bgB));
 
-            // Селектор если выбрано (как в оригинале — тёмная подложка)
+            // Акцент при выборе
             if (anim > 0.02f) {
+                // тёмный оверлей
+                DrawHelper.drawRect(ms.peek().getPositionMatrix(), curX, btnY, btnW, btnH, radius,
+                    new Color(0, 0, 0, (int)(50 * anim)));
+                // нижняя линия
+                float lw = (btnW - 10) * anim;
                 DrawHelper.drawRect(ms.peek().getPositionMatrix(),
-                    curX, btnY, btnW, btnH, radius,
-                    new Color(0, 0, 0, (int)(anim * 60)));
-                // Нижняя линия-акцент
-                float lw = btnW * 0.7f * anim;
-                DrawHelper.drawRect(ms.peek().getPositionMatrix(),
-                    curX + (btnW-lw)/2f, btnY+btnH-2, lw, 2, 1,
-                    new Color(125, 136, 255, (int)(255*anim)));
-                // Outline
+                    curX + (btnW - lw) / 2f, btnY + btnH - 2, lw, 2, 1,
+                    new Color(125, 136, 255, (int)(255 * anim)));
+                // outline
                 DrawHelper.drawOutline(ms, curX, btnY, btnW, btnH, radius,
-                    new Color(80, 90, 200, (int)(100*anim)), 1);
+                    new Color(80, 90, 200, (int)(120 * anim)), 1);
             }
 
-            // Текст
-            Color selectedColor = new Color(197, 200, 255);
-            Color normalColor   = new Color(141, 144, 199);
-            int r2 = (int)(normalColor.getRed()   + (selectedColor.getRed()   - normalColor.getRed())   * anim);
-            int g2 = (int)(normalColor.getGreen() + (selectedColor.getGreen() - normalColor.getGreen()) * anim);
-            int b2 = (int)(normalColor.getBlue()  + (selectedColor.getBlue()  - normalColor.getBlue())  * anim);
+            // Текст Inter Medium
+            Color selC = new Color(197, 200, 255);
+            Color norC = new Color(141, 144, 199);
+            int tr = (int)(norC.getRed()   + (selC.getRed()   - norC.getRed())   * anim);
+            int tg = (int)(norC.getGreen() + (selC.getGreen() - norC.getGreen()) * anim);
+            int tb = (int)(norC.getBlue()  + (selC.getBlue()  - norC.getBlue())  * anim);
 
-            float tx = curX + (btnW - Fonts.width(cat.getDisplayName())) / 2f;
+            float tx = curX + (btnW - Fonts.mediumWidth(cat.getDisplayName())) / 2f;
             float ty = btnY + (btnH - Fonts.height()) / 2f;
-            DrawHelper.drawText(ctx, cat.getDisplayName(), tx, ty, new Color(r2,g2,b2));
+            DrawHelper.drawTextMedium(ctx, cat.getDisplayName(), tx, ty, new Color(tr, tg, tb));
 
             categoryBounds.put(cat, new float[]{curX, btnY, btnW, btnH});
-            curX += btnW + 10;
+            curX += btnW + 8;
         }
     }
 }
