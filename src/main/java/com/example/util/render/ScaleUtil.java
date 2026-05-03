@@ -16,14 +16,6 @@ public class ScaleUtil {
         return MinecraftClient.getInstance().getWindow().getScaledHeight();
     }
 
-    /**
-     * Переводит scaled-координаты мыши в реальные пиксельные.
-     */
-    public static double toRealX(double scaledX) {
-        return scaledX * getScale();
-    }
-
-    public static double toRealY(double scaledY) {
-        return scaledY * getScale();
-    }
+    public static double toRealX(double scaledX) { return scaledX * getScale(); }
+    public static double toRealY(double scaledY) { return scaledY * getScale(); }
 }
