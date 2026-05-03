@@ -131,10 +131,9 @@ public class DrawHelper {
 
     // ── Text ──────────────────────────────────────────────────
     public static void drawText(Matrix4f m, TextRenderer font, String text, float x, float y, Color color) {
-        // Рисуем через MatrixStack-обёртку
         RenderSystem.enableBlend();
         net.minecraft.client.MinecraftClient.getInstance()
-            .getTextRenderer().draw(text, x, y, color.getRGB(), false, m,
+            .textRenderer.draw(text, x, y, color.getRGB(), false, m,
                 net.minecraft.client.MinecraftClient.getInstance()
                     .getBufferBuilders().getEntityVertexConsumers(),
                 net.minecraft.client.font.TextRenderer.TextLayerType.NORMAL, 0, 0xF000F0);
