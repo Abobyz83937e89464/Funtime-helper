@@ -28,9 +28,7 @@ public class CategoryElement {
     private static Category selectedCategory = Category.COMBAT;
 
     private final Map<Category, float[]> categoryBounds = new HashMap<>();
-
-    // Плавная анимация: значения от 0.0 до 1.0, обновляются каждый render
-    private final Map<Category, Float> colorAnims = new HashMap<>();
+    private final Map<Category, Float>   colorAnims     = new HashMap<>();
 
     public CategoryElement() {
         for (Category c : Category.values())
@@ -42,8 +40,8 @@ public class CategoryElement {
     public boolean mouseClicked(double mouseX, double mouseY) {
         for (var entry : categoryBounds.entrySet()) {
             float[] b = entry.getValue();
-            if (mouseX >= b[0] && mouseX <= b[0]+b[2]
-             && mouseY >= b[1] && mouseY <= b[1]+b[3]) {
+            if (mouseX >= b[0] && mouseX <= b[0] + b[2]
+             && mouseY >= b[1] && mouseY <= b[1] + b[3]) {
                 selectedCategory = entry.getKey();
                 return true;
             }
@@ -63,7 +61,6 @@ public class CategoryElement {
         float btnPad = 10f;
         float btnGap = 6f;
 
-        // Суммарная ширина
         float totalWidth = 0f;
         for (int i = 0; i < cats.length; i++) {
             totalWidth += Fonts.width(cats[i].getDisplayName()) + btnPad * 2;
@@ -75,28 +72,28 @@ public class CategoryElement {
         int   a    = (int)(255 * openAnim);
 
         for (Category cat : cats) {
-            // Плавная анимация — lerp каждый frame рендера
+            // Плавная анимация
             float target = (cat == selectedCategory) ? 1f : 0f;
             float anim   = colorAnims.getOrDefault(cat, 0f);
-            anim += (target - anim) * 0.12f;  // скорость анимации
+            anim += (target - anim) * 0.12f;
             colorAnims.put(cat, anim);
 
             float btnW = Fonts.width(cat.getDisplayName()) + btnPad * 2;
             float rad  = btnH / 2f;
 
-            // Тень под выбранной кнопкой
+            // Glow под выбранной кнопкой
             if (anim > 0.02f) {
                 DrawHelper.drawGlow(m, curX, btnY, btnW, btnH, rad, 8,
                     new Color(125, 136, 255, (int)(40 * anim * openAnim)));
             }
 
-            // Фон кнопки (интерполяция от прозрачного к тёмному)
+            // Фон кнопки
             int bgAlpha = (int)(Math.max(anim, 0.12f) * 180 * openAnim);
             DrawHelper.drawRect(m, curX, btnY, btnW, btnH, rad,
                 new Color(35, 37, 55, bgAlpha));
 
             if (anim > 0.02f) {
-                // Outline выбранной кнопки
+                // Outline выбранной
                 DrawHelper.drawOutline(ms, curX, btnY, btnW, btnH, rad,
                     new Color(100, 110, 230, (int)(130 * anim * openAnim)), 1);
 
@@ -106,11 +103,11 @@ public class CategoryElement {
                 DrawHelper.drawRect(m, lx, btnY + btnH - 2f, lw, 2f, 1f,
                     new Color(125, 136, 255, (int)(240 * anim * openAnim)));
                 // Glow под линией
-                DrawHelper.drawRect(m, lx, btnY + btnH - 5f, lw, 5f, 1f,
-                    new Color(125, 136, 255, (int)(35 * anim * openAnim)));
+                DrawHelper.drawRect(m, lx, btnY + btnH - 6f, lw, 6f, 1f,
+                    new Color(125, 136, 255, (int)(30 * anim * openAnim)));
             }
 
-            // Текст — lerp цвет
+            // Цвет текста — lerp
             Color selC = new Color(210, 215, 255);
             Color norC = new Color(100, 103, 150);
             int tr = (int)(norC.getRed()   + (selC.getRed()   - norC.getRed())   * anim);
