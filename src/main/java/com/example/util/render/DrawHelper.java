@@ -1,178 +1,145 @@
 package com.example.util.render;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.text.Text;
+import net.minecraft.resource.ResourceFactory;
+import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL20;
 
 import java.awt.Color;
 
 public class DrawHelper {
 
-    // ══════════════════════════════════════════════════════════════════════
-    // FILLED RECTANGLES
-    // ══════════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // SHADER INIT
+    // ═══════════════════════════════════════════════════════════════
 
-    /** Скруглённый прямоугольник, все углы одинаковые */
-    public static void drawRect(Matrix4f m, float x, float y, float w, float h, float r, Color c) {
-        if (w <= 0 || h <= 0) return;
-        r = Math.min(r, Math.min(w / 2f, h / 2f));
-        if (r <= 0) { drawRectRaw(m, x, y, w, h, c); return; }
+    private static ShaderProgram shader;
 
-        drawRectRaw(m, x + r,     y,         w - r * 2, h,         c); // центр
-        drawRectRaw(m, x,         y + r,     r,         h - r * 2, c); // лево
-        drawRectRaw(m, x + w - r, y + r,     r,         h - r * 2, c); // право
-        drawCorner (m, x + r,     y + r,     r, 180, c);
-        drawCorner (m, x + w - r, y + r,     r, 270, c);
-        drawCorner (m, x + w - r, y + h - r, r,   0, c);
-        drawCorner (m, x + r,     y + h - r, r,  90, c);
+    /**
+     * Вызови ОДИН РАЗ при загрузке ресурсов.
+     * Пример: внутри ResourceReloadListener или CLIENT_STARTED.
+     */
+    public static void init(ResourceFactory rm) {
+        try {
+            shader = new ShaderProgram(
+                rm,
+                Identifier.of("nocturn-client", "rounded_rect"),
+                VertexFormats.POSITION_TEXTURE
+            );
+        } catch (Exception e) {
+            System.err.println("[DrawHelper] Shader load failed: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
-    /** Простой fill без скруглений через DrawContext */
-    public static void drawRect(DrawContext ctx, float x, float y, float w, float h, Color c) {
-        if (w <= 0 || h <= 0) return;
-        ctx.fill((int) x, (int) y, (int)(x + w), (int)(y + h), c.getRGB());
+    private static boolean ok() { return shader != null; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ОСНОВНЫЕ МЕТОДЫ (те же сигнатуры что были — ничего менять не надо)
+    // ═══════════════════════════════════════════════════════════════
+
+    /** Скруглённый прямоугольник */
+    public static void drawRect(Matrix4f m, float x, float y, float w, float h,
+                                float radius, Color color) {
+        sdf(m, x, y, w, h, radius, color, null, 0, null, 0, -1);
+    }
+
+    /** Без радиуса */
+    public static void drawRect(Matrix4f m, float x, float y, float w, float h, Color color) {
+        sdf(m, x, y, w, h, 0, color, null, 0, null, 0, -1);
+    }
+
+    /** Через DrawContext (для оверлеев) */
+    public static void drawRect(DrawContext ctx, float x, float y, float w, float h, Color color) {
+        sdf(ctx.getMatrices().peek().getPositionMatrix(),
+            x, y, w, h, 0, color, null, 0, null, 0, -1);
     }
 
     /**
-     * Прямоугольник с РАЗНЫМИ радиусами углов: tl=верх-лево, tr=верх-право, br=низ-право, bl=низ-лево.
-     * Полностью переписан — без артефактов.
+     * Разные радиусы для каждого угла.
+     * tl=верх-лево, tr=верх-право, br=низ-право, bl=низ-лево
      */
     public static void drawStyledRect(Matrix4f m, float x, float y, float w, float h,
-                                      float tl, float tr, float br, float bl, Color c) {
-        // Ограничиваем радиусы
-        float maxR = Math.min(w / 2f, h / 2f);
-        tl = Math.min(tl, maxR); tr = Math.min(tr, maxR);
-        br = Math.min(br, maxR); bl = Math.min(bl, maxR);
-
-        // Верхняя горизонтальная полоса (между верхними углами)
-        drawRectRaw(m, x + tl, y, w - tl - tr, Math.max(tl, tr), c);
-        // Средняя полоса (полная ширина, без угловых зон)
-        float midTop = Math.max(tl, tr);
-        float midBot = Math.max(bl, br);
-        float midH   = h - midTop - midBot;
-        if (midH > 0) drawRectRaw(m, x, y + midTop, w, midH, c);
-        // Нижняя горизонтальная полоса
-        drawRectRaw(m, x + bl, y + h - Math.max(bl, br), w - bl - br, Math.max(bl, br), c);
-
-        // Заполняем боковые зоны у угловых секций
-        if (tl < Math.max(tl, tr) && tl > 0)
-            drawRectRaw(m, x, y + tl, tl, Math.max(tl, tr) - tl, c);
-        if (tr < Math.max(tl, tr) && tr > 0)
-            drawRectRaw(m, x + w - tr, y + tr, tr, Math.max(tl, tr) - tr, c);
-        if (bl < Math.max(bl, br) && bl > 0)
-            drawRectRaw(m, x, y + h - Math.max(bl, br), bl, Math.max(bl, br) - bl, c);
-        if (br < Math.max(bl, br) && br > 0)
-            drawRectRaw(m, x + w - br, y + h - Math.max(bl, br), br, Math.max(bl, br) - br, c);
-
-        // Углы
-        if (tl > 0) drawCorner(m, x + tl,     y + tl,     tl, 180, c);
-        if (tr > 0) drawCorner(m, x + w - tr, y + tr,     tr, 270, c);
-        if (br > 0) drawCorner(m, x + w - br, y + h - br, br,   0, c);
-        if (bl > 0) drawCorner(m, x + bl,     y + h - bl, bl,  90, c);
-    }
-
-    // ── Примитивы ─────────────────────────────────────────────────────────
-
-    public static void drawRectRaw(Matrix4f m, float x, float y, float w, float h, Color c) {
-        if (w <= 0 || h <= 0) return;
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float r = c.getRed()/255f, g = c.getGreen()/255f, b = c.getBlue()/255f, a = c.getAlpha()/255f;
-        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-        buf.vertex(m, x,     y + h, 0).color(r, g, b, a);
-        buf.vertex(m, x + w, y + h, 0).color(r, g, b, a);
-        buf.vertex(m, x + w, y,     0).color(r, g, b, a);
-        buf.vertex(m, x,     y,     0).color(r, g, b, a);
-        BufferRenderer.drawWithGlobalProgram(buf.end());
-        RenderSystem.disableBlend();
-    }
-
-    private static void drawCorner(Matrix4f m, float cx, float cy, float r, float deg, Color c) {
-        if (r <= 0) return;
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float red = c.getRed()/255f, g = c.getGreen()/255f, b = c.getBlue()/255f, a = c.getAlpha()/255f;
-        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
-        buf.vertex(m, cx, cy, 0).color(red, g, b, a);
-        for (int i = 0; i <= 20; i++) {
-            double angle = Math.toRadians(deg + 90.0 * i / 20);
-            buf.vertex(m, cx + (float)Math.cos(angle) * r, cy + (float)Math.sin(angle) * r, 0).color(red, g, b, a);
+                                      float tl, float tr, float br, float bl, Color color) {
+        if (tl == tr && tr == br && br == bl) {
+            drawRect(m, x, y, w, h, tl, color);
+            return;
         }
-        BufferRenderer.drawWithGlobalProgram(buf.end());
-        RenderSystem.disableBlend();
+        float topR = Math.max(tl, tr);
+        float botR = Math.max(bl, br);
+        float half = h / 2f;
+
+        sdf(m, x, y,        w, half + 1, topR, color, null, 0, null, 0, -1);
+        sdf(m, x, y + half, w, half + 1, botR, color, null, 0, null, 0, -1);
+
+        // Перекрываем лишние скруглённые углы квадратами
+        if (tl == 0 && topR > 0) drawRectRaw(m, x,             y,             topR, topR, color);
+        if (tr == 0 && topR > 0) drawRectRaw(m, x + w - topR,  y,             topR, topR, color);
+        if (bl == 0 && botR > 0) drawRectRaw(m, x,             y + h - botR,  botR, botR, color);
+        if (br == 0 && botR > 0) drawRectRaw(m, x + w - botR,  y + h - botR,  botR, botR, color);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // GLOW
-    // ══════════════════════════════════════════════════════════════════════
-
-    public static void drawGlow(Matrix4f m, float x, float y, float w, float h,
-                                float r, int spread, Color color) {
-        for (int i = spread; i >= 1; i--) {
-            float t     = (float) i / spread;
-            float alpha = color.getAlpha() * (1f - t) * (1f - t) * 0.9f;
-            if (alpha < 1) continue;
-            float ex = spread - i + 1;
-            drawRect(m, x - ex, y - ex, w + ex*2, h + ex*2, r + ex,
-                new Color(color.getRed(), color.getGreen(), color.getBlue(), (int) Math.min(255, alpha)));
-        }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // OUTLINE
-    // ══════════════════════════════════════════════════════════════════════
-
+    /** Outline (обводка) */
     public static void drawOutline(MatrixStack ms, float x, float y, float w, float h,
-                                   float r, Color color, float thickness) {
-        Matrix4f m = ms.peek().getPositionMatrix();
-        for (float t = 0; t < thickness; t++) {
-            int alpha = (int)(color.getAlpha() * (1f - t / (thickness + 1)));
-            drawOutlineRaw(m, x - t, y - t, w + t*2, h + t*2, r + t,
-                new Color(color.getRed(), color.getGreen(), color.getBlue(), Math.max(0, alpha)));
-        }
+                                   float radius, Color color, float thickness) {
+        sdf(ms.peek().getPositionMatrix(),
+            x - thickness, y - thickness,
+            w + thickness * 2, h + thickness * 2,
+            radius + thickness,
+            new Color(0, 0, 0, 0),
+            color, thickness,
+            null, 0, -1);
     }
 
-    private static void drawOutlineRaw(Matrix4f m, float x, float y, float w, float h, float r, Color c) {
-        drawRectRaw(m, x + r,     y,         w - r*2, 1,       c);
-        drawRectRaw(m, x + r,     y + h - 1, w - r*2, 1,       c);
-        drawRectRaw(m, x,         y + r,     1,       h - r*2, c);
-        drawRectRaw(m, x + w - 1, y + r,     1,       h - r*2, c);
-        drawArc(m, x + r,     y + r,     r, 180, c);
-        drawArc(m, x + w - r, y + r,     r, 270, c);
-        drawArc(m, x + w - r, y + h - r, r,   0, c);
-        drawArc(m, x + r,     y + h - r, r,  90, c);
+    /** Мягкое свечение вокруг прямоугольника */
+    public static void drawGlow(Matrix4f m, float x, float y, float w, float h,
+                                float radius, int spread, Color color) {
+        sdf(m,
+            x - spread, y - spread,
+            w + spread * 2f, h + spread * 2f,
+            radius + spread,
+            new Color(0, 0, 0, 0),
+            null, 0,
+            color, spread, -1);
     }
 
-    private static void drawArc(Matrix4f m, float cx, float cy, float r, float deg, Color c) {
-        if (r <= 0) return;
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float red = c.getRed()/255f, g = c.getGreen()/255f, b = c.getBlue()/255f, a = c.getAlpha()/255f;
-        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
-        for (int i = 0; i <= 20; i++) {
-            double angle = Math.toRadians(deg + 90.0 * i / 20);
-            float cos = (float)Math.cos(angle), sin = (float)Math.sin(angle);
-            buf.vertex(m, cx + cos*(r-1), cy + sin*(r-1), 0).color(red, g, b, a);
-            buf.vertex(m, cx + cos*r,     cy + sin*r,     0).color(red, g, b, a);
-        }
-        BufferRenderer.drawWithGlobalProgram(buf.end());
-        RenderSystem.disableBlend();
+    /** Переливающийся прямоугольник (shimmer по hue) */
+    public static void drawShimmer(Matrix4f m, float x, float y, float w, float h,
+                                   float radius, Color baseColor) {
+        float time = (System.currentTimeMillis() % 100_000L) / 1000f;
+        sdf(m, x, y, w, h, radius, baseColor, null, 0, null, 0, time);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // GRADIENTS
-    // ══════════════════════════════════════════════════════════════════════
+    /** Круг через SDF (идеальный, без лесенки) */
+    public static void drawCircle(Matrix4f m, float cx, float cy, int segments, float r, Color color) {
+        sdf(m, cx - r, cy - r, r * 2, r * 2, r, color, null, 0, null, 0, -1);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // RAINBOW
+    // ═══════════════════════════════════════════════════════════════
+
+    public static Color getRainbow(float offset, float speed, float sat, float brightness, int alpha) {
+        float hue = ((System.currentTimeMillis() % (long)(speed * 1000)) / (speed * 1000f) + offset) % 1f;
+        Color c = Color.getHSBColor(hue, sat, brightness);
+        return new Color(c.getRed(), c.getGreen(), c.getBlue(), alpha);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ГРАДИЕНТЫ
+    // ═══════════════════════════════════════════════════════════════
 
     public static void drawGradientV(DrawContext ctx, float x, float y, float w, float h,
                                      Color top, Color bottom) {
-        ctx.fillGradient((int)x, (int)y, (int)(x+w), (int)(y+h), top.getRGB(), bottom.getRGB());
+        ctx.fillGradient((int)x, (int)y, (int)(x+w), (int)(y+h),
+                         top.getRGB(), bottom.getRGB());
     }
 
     public static void drawGradientH(Matrix4f m, float x, float y, float w, float h,
@@ -180,47 +147,19 @@ public class DrawHelper {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-        buf.vertex(m, x,     y+h, 0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
-        buf.vertex(m, x+w,   y+h, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
-        buf.vertex(m, x+w,   y,   0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
-        buf.vertex(m, x,     y,   0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
+        BufferBuilder buf = Tessellator.getInstance().begin(
+            VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+        buf.vertex(m, x,   y+h, 0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
+        buf.vertex(m, x+w, y+h, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buf.vertex(m, x+w, y,   0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
+        buf.vertex(m, x,   y,   0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
         BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
 
-    /** Горизонтальный градиент с разными цветами через DrawContext */
-    public static void drawGradientH(DrawContext ctx, float x, float y, float w, float h,
-                                     Color left, Color right) {
-        drawGradientH(ctx.getMatrices().peek().getPositionMatrix(), x, y, w, h, left, right);
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // CIRCLE
-    // ══════════════════════════════════════════════════════════════════════
-
-    public static void drawCircle(Matrix4f m, float cx, float cy, int segments, float r, Color c) {
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float red = c.getRed()/255f, g = c.getGreen()/255f, b = c.getBlue()/255f, a = c.getAlpha()/255f;
-        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
-        buf.vertex(m, cx, cy, 0).color(red, g, b, a);
-        for (int i = 0; i <= segments; i++) {
-            double angle = Math.toRadians(360.0 * i / segments);
-            buf.vertex(m, cx + (float)Math.cos(angle)*r, cy + (float)Math.sin(angle)*r, 0).color(red, g, b, a);
-        }
-        BufferRenderer.drawWithGlobalProgram(buf.end());
-        RenderSystem.disableBlend();
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // TEXT
-    // ══════════════════════════════════════════════════════════════════════
-
-    public static void drawText(DrawContext ctx, Text text, float x, float y, Color c, boolean shadow) {
-        ctx.drawText(Fonts.get(), text, (int)x, (int)y, c.getRGB(), shadow);
-    }
+    // ═══════════════════════════════════════════════════════════════
+    // ТЕКСТ
+    // ═══════════════════════════════════════════════════════════════
 
     public static void drawText(DrawContext ctx, String text, float x, float y, Color c) {
         ctx.drawText(Fonts.get(), Fonts.medium(text), (int)x, (int)y, c.getRGB(), false);
@@ -242,17 +181,86 @@ public class DrawHelper {
         ctx.drawText(Fonts.get(), Fonts.regular(text), (int)x, (int)y, c.getRGB(), false);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // RAINBOW HELPER
-    // ══════════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // RAW RECT (для разделителей 1px — шейдер не нужен)
+    // ═══════════════════════════════════════════════════════════════
 
-    /**
-     * Возвращает rainbow цвет по времени + смещению (0..1).
-     * speed — чем больше, тем медленнее (делитель миллисекунд).
-     */
-    public static Color getRainbow(float offset, float speed, float saturation, float brightness, int alpha) {
-        float hue = ((System.currentTimeMillis() % (long)(speed * 1000)) / (speed * 1000f) + offset) % 1f;
-        Color c = Color.getHSBColor(hue, saturation, brightness);
-        return new Color(c.getRed(), c.getGreen(), c.getBlue(), alpha);
+    public static void drawRectRaw(Matrix4f m, float x, float y, float w, float h, Color c) {
+        if (w <= 0 || h <= 0) return;
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+        float r = c.getRed()/255f, g = c.getGreen()/255f,
+              b = c.getBlue()/255f, a = c.getAlpha()/255f;
+        BufferBuilder buf = Tessellator.getInstance().begin(
+            VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+        buf.vertex(m, x,   y+h, 0).color(r, g, b, a);
+        buf.vertex(m, x+w, y+h, 0).color(r, g, b, a);
+        buf.vertex(m, x+w, y,   0).color(r, g, b, a);
+        buf.vertex(m, x,   y,   0).color(r, g, b, a);
+        BufferRenderer.drawWithGlobalProgram(buf.end());
+        RenderSystem.disableBlend();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CORE SDF DRAW
+    // ═══════════════════════════════════════════════════════════════
+
+    private static void sdf(Matrix4f mat,
+                            float x, float y, float w, float h,
+                            float radius,
+                            Color fill,
+                            Color outlineColor, float outlineWidth,
+                            Color glowColor,    float glowRadius,
+                            float time) {
+        if (!ok() || w <= 0 || h <= 0) return;
+
+        int prog = shader.getProgramRef();
+
+        RenderSystem.enableBlend();
+        RenderSystem.blendFuncSeparate(
+            GlStateManager.SrcFactor.SRC_ALPHA,
+            GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA,
+            GlStateManager.SrcFactor.ONE,
+            GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
+        RenderSystem.setShader(() -> shader);
+
+        u2f(prog, "u_Resolution", w, h);
+        u4f(prog, "u_Rect", 0, 0, w, h);
+        u1f(prog, "u_Radius", Math.min(radius, Math.min(w, h) / 2f));
+
+        u4c(prog, "u_Color",        fill         != null ? fill         : new Color(0,0,0,0));
+        u4c(prog, "u_OutlineColor", outlineColor != null ? outlineColor : new Color(0,0,0,0));
+        u1f(prog, "u_OutlineWidth", outlineColor != null ? outlineWidth : 0);
+        u4c(prog, "u_GlowColor",    glowColor    != null ? glowColor    : new Color(0,0,0,0));
+        u1f(prog, "u_GlowRadius",   glowColor    != null ? glowRadius   : 0);
+        u1f(prog, "u_Time",         time < 0 ? 0f : time);
+
+        BufferBuilder buf = Tessellator.getInstance().begin(
+            VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+        buf.vertex(mat, x,   y,   0).texture(0, 0);
+        buf.vertex(mat, x,   y+h, 0).texture(0, 1);
+        buf.vertex(mat, x+w, y+h, 0).texture(1, 1);
+        buf.vertex(mat, x+w, y,   0).texture(1, 0);
+        BufferRenderer.drawWithGlobalProgram(buf.end());
+
+        RenderSystem.disableBlend();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // GL HELPERS
+    // ═══════════════════════════════════════════════════════════════
+
+    private static void u1f(int p, String n, float a) {
+        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform1f(l, a);
+    }
+    private static void u2f(int p, String n, float a, float b) {
+        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform2f(l, a, b);
+    }
+    private static void u4f(int p, String n, float a, float b, float c, float d) {
+        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform4f(l, a, b, c, d);
+    }
+    private static void u4c(int p, String n, Color c) {
+        u4f(p, n, c.getRed()/255f, c.getGreen()/255f, c.getBlue()/255f, c.getAlpha()/255f);
     }
 }
