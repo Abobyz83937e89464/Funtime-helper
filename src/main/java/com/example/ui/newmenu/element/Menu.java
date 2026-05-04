@@ -141,7 +141,7 @@ public class Menu extends Screen {
             new Color(29, 31, 44, 0));
 
         float textY  = y + (HEADER_H - Fonts.height()) / 2f;
-        float logoXE = x + 12 + Fonts.widthBold("Funtime");
+        float logoXE = x + 12 + Fonts.boldWidth("Funtime");
 
         // Логотип
         DrawHelper.drawTextBoldShadow(ctx, "Funtime", x + 12, textY, new Color(197, 200, 255, a));
