@@ -1,7 +1,7 @@
 {
   "blend": { "func": "add", "srcrgb": "srcalpha", "dstrgb": "1-srcalpha" },
-  "vertex": "yourmod:rounded_rect",
-  "fragment": "yourmod:rounded_rect",
+  "vertex": "nocturn-client:rounded_rect",
+  "fragment": "nocturn-client:rounded_rect",
   "attributes": [ "Position", "UV0" ],
   "uniforms": [
     { "name": "ModelViewMat",   "type": "matrix4x4", "count": 16, "values": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1] },
