@@ -4,6 +4,7 @@ import com.example.util.render.DrawHelper;
 import com.example.util.render.Fonts;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.util.math.MatrixStack;
+import org.joml.Matrix4f;
 
 import java.awt.Color;
 import java.util.HashMap;
@@ -11,16 +12,9 @@ import java.util.Map;
 
 public class CategoryElement {
 
-    // ── Палитра ───────────────────────────────────────────────
-    private static final Color ACCENT      = new Color(0x6C, 0x7B, 0xFF);
-    private static final Color TEXT_SEL    = new Color(0xE6, 0xE9, 0xFF);
-    private static final Color TEXT_NOR    = new Color(0x8A, 0x90, 0xC2);
-    private static final Color BTN_SEL_BG  = new Color(0x22, 0x25, 0x38);
-    private static final Color BTN_NOR_BG  = new Color(0x16, 0x17, 0x21);
-
     public enum Category {
         COMBAT("Combat"),
-        MOVEMENT("Move"),
+        MOVEMENT("Movement"),
         RENDER("Render"),
         PLAYER("Player"),
         WORLD("World"),
@@ -32,24 +26,32 @@ public class CategoryElement {
     }
 
     private static Category selectedCategory = Category.COMBAT;
-    private final Map<Category, float[]> bounds     = new HashMap<>();
-    private final Map<Category, Float>   anims      = new HashMap<>();
+
+    // Bounds каждой кнопки категории: [x, y, w, h]
+    private final Map<Category, float[]> categoryBounds = new HashMap<>();
+
+    // Анимации: значения от 0.0 до 1.0
+    private final Map<Category, Float> colorAnims = new HashMap<>();
 
     public CategoryElement() {
-        for (Category c : Category.values())
-            anims.put(c, c == selectedCategory ? 1f : 0f);
+        for (Category c : Category.values()) {
+            colorAnims.put(c, c == selectedCategory ? 1f : 0f);
+        }
     }
 
-    public Category getSelectedCategory() { return selectedCategory; }
+    public Category getSelectedCategory() {
+        return selectedCategory;
+    }
 
-    public boolean mouseClicked(double mx, double my) {
-        for (var e : bounds.entrySet()) {
-            float[] b = e.getValue();
-            if (mx >= b[0] && mx <= b[0] + b[2] && my >= b[1] && my <= b[1] + b[3]) {
-                if (selectedCategory != e.getKey()) {
-                    anims.put(selectedCategory, 0f);
-                    selectedCategory = e.getKey();
-                    anims.put(selectedCategory, 1f);
+    public boolean mouseClicked(double mouseX, double mouseY) {
+        for (var entry : categoryBounds.entrySet()) {
+            float[] b = entry.getValue();
+            if (mouseX >= b[0] && mouseX <= b[0] + b[2]
+             && mouseY >= b[1] && mouseY <= b[1] + b[3]) {
+                if (selectedCategory != entry.getKey()) {
+                    colorAnims.put(selectedCategory, 0f);
+                    selectedCategory = entry.getKey();
+                    colorAnims.put(selectedCategory, 1f);
                 }
                 return true;
             }
@@ -57,73 +59,77 @@ public class CategoryElement {
         return false;
     }
 
-    public void renderFooter(DrawContext ctx, float x, float y, float footerW, float footerH) {
+    /**
+     * Рисует кнопки категорий внутри футера.
+     * openAnim — значение 0..1 для плавного появления меню.
+     */
+    public void renderFooter(DrawContext ctx, float x, float y,
+                             float footerW, float footerH, float openAnim) {
         MatrixStack ms = ctx.getMatrices();
-        bounds.clear();
+        Matrix4f m = ms.peek().getPositionMatrix();
+        categoryBounds.clear();
 
         Category[] cats = Category.values();
 
-        // Суммарная ширина
-        int totalWidth = 0;
+        // Считаем суммарную ширину всех кнопок
+        float btnH     = 20f;
+        float btnPad   = 8f;  // горизонтальный отступ текста внутри кнопки
+        float btnGap   = 6f;  // отступ между кнопками
+
+        float totalWidth = 0f;
         for (int i = 0; i < cats.length; i++) {
-            totalWidth += Fonts.mediumWidth(cats[i].getDisplayName()) + 18;
-            if (i < cats.length - 1) totalWidth += 8;
+            totalWidth += Fonts.width(cats[i].getDisplayName()) + btnPad * 2;
+            if (i < cats.length - 1) totalWidth += btnGap;
         }
 
         float curX = x + (footerW - totalWidth) / 2f;
-        float btnH = 20f;
         float btnY = y + (footerH - btnH) / 2f;
+        int   a    = (int) (255 * openAnim);
 
         for (Category cat : cats) {
-            float target = cat == selectedCategory ? 1f : 0f;
-            float anim   = anims.getOrDefault(cat, 0f);
-            anim += (target - anim) * 0.14f;
-            anims.put(cat, anim);
+            // Плавная анимация
+            float target = (cat == selectedCategory) ? 1f : 0f;
+            float anim   = colorAnims.getOrDefault(cat, 0f);
+            anim += (target - anim) * 0.20f;
+            colorAnims.put(cat, anim);
 
-            float btnW  = Fonts.mediumWidth(cat.getDisplayName()) + 18;
-            float radius = btnH / 2f;
+            float btnW  = Fonts.width(cat.getDisplayName()) + btnPad * 2;
+            float rad   = btnH / 2f;  // капсула
 
-            // Тень под выбранной кнопкой
-            if (anim > 0.05f)
-                DrawHelper.drawShadow(ms, curX, btnY, btnW, btnH, radius, 6f,
-                    new Color(108, 123, 255, (int)(80 * anim)));
-
-            // Фон кнопки
-            Color bg = lerpColor(BTN_NOR_BG, BTN_SEL_BG, anim);
-            DrawHelper.drawRect(ms.peek().getPositionMatrix(), curX, btnY, btnW, btnH, radius, bg);
-
-            // Outline выбранной
-            if (anim > 0.02f)
-                DrawHelper.drawOutline(ms, curX - 1, btnY - 1, btnW + 2, btnH + 2, radius,
-                    new Color(108, 123, 255, (int)(110 * anim)), 1);
-
-            // Нижняя линия-акцент
+            // Фон кнопки — темнее для невыбранных, ярче для выбранных
             if (anim > 0.02f) {
-                float lw = (btnW - 8) * anim;
-                DrawHelper.drawRect(ms.peek().getPositionMatrix(),
-                    curX + (btnW - lw) / 2f, btnY + btnH - 2, lw, 2, 1,
-                    new Color(108, 123, 255, (int)(240 * anim)));
-                // Glow
-                DrawHelper.drawRect(ms.peek().getPositionMatrix(),
-                    curX + (btnW - lw) / 2f, btnY + btnH - 4, lw, 4, 1,
-                    new Color(108, 123, 255, (int)(40 * anim)));
+                // Подложка (тёмная) — видна при выбранном состоянии
+                DrawHelper.drawRect(m, curX, btnY, btnW, btnH, rad,
+                    new Color(0, 0, 0, (int) (55 * anim * (a / 255f))));
+
+                // Фиолетовый glow при выбранном состоянии
+                DrawHelper.drawGlow(m, curX, btnY, btnW, btnH, rad, 6,
+                    new Color(125, 136, 255, (int) (35 * anim * (a / 255f))));
+
+                // Нижняя синяя линия-акцент
+                float lw = (btnW - 8f) * anim;
+                DrawHelper.drawRect(m,
+                    curX + (btnW - lw) / 2f, btnY + btnH - 2f, lw, 2f, 1f,
+                    new Color(125, 136, 255, (int) (255 * anim * (a / 255f))));
+
+                // Outline
+                DrawHelper.drawOutline(ms, curX, btnY, btnW, btnH, rad,
+                    new Color(80, 90, 200, (int) (110 * anim * (a / 255f))), 1);
             }
 
-            // Текст
-            Color textC = lerpColor(TEXT_NOR, TEXT_SEL, anim);
-            float tx = curX + (btnW - Fonts.mediumWidth(cat.getDisplayName())) / 2f;
+            // Цвет текста: интерполяция normal → selected
+            Color selColor = new Color(197, 200, 255);
+            Color nrmColor = new Color(100, 103, 145);
+            int r2 = (int)(nrmColor.getRed()   + (selColor.getRed()   - nrmColor.getRed())   * anim);
+            int g2 = (int)(nrmColor.getGreen() + (selColor.getGreen() - nrmColor.getGreen()) * anim);
+            int b2 = (int)(nrmColor.getBlue()  + (selColor.getBlue()  - nrmColor.getBlue())  * anim);
+
+            float tx = curX + (btnW - Fonts.width(cat.getDisplayName())) / 2f;
             float ty = btnY + (btnH - Fonts.height()) / 2f;
-            DrawHelper.drawTextMedium(ctx, cat.getDisplayName(), tx, ty, textC);
+            DrawHelper.drawText(ctx, cat.getDisplayName(), tx, ty, new Color(r2, g2, b2, a));
 
-            bounds.put(cat, new float[]{curX, btnY, btnW, btnH});
-            curX += btnW + 8;
+            categoryBounds.put(cat, new float[]{ curX, btnY, btnW, btnH });
+            curX += btnW + btnGap;
         }
-    }
-
-    private Color lerpColor(Color a, Color b, float t) {
-        return new Color(
-            (int)(a.getRed()   + (b.getRed()   - a.getRed())   * t),
-            (int)(a.getGreen() + (b.getGreen() - a.getGreen()) * t),
-            (int)(a.getBlue()  + (b.getBlue()  - a.getBlue())  * t));
     }
 }
