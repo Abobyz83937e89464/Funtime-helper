@@ -16,35 +16,34 @@ import java.util.List;
 
 public class Menu extends Screen {
 
-    // ── Размеры ───────────────────────────────────────────────────────────
-    static final int CONTENT_W = 440;   // чуть меньше чем было 460
-    static final int CONTENT_H = 210;   // чуть меньше чем было 240
+    static final int CONTENT_W = 440;
+    static final int CONTENT_H = 210;
     static final int HEADER_H  = 32;
     static final int FOOTER_H  = 34;
     static final int TOTAL_H   = HEADER_H + CONTENT_H + FOOTER_H;
-
-    static final int   COLS    = 4;
-    static final int   PADDING = 6;
-    // Ширина модуля автоматически под ширину контента
+    static final int COLS      = 4;
+    static final int PADDING   = 7;
     static final float MOD_W   = (CONTENT_W - (float) PADDING * (COLS + 1)) / COLS;
 
-    // ── Элементы ──────────────────────────────────────────────────────────
     private final CategoryElement   categoryElement = new CategoryElement();
     private final ModuleElement     moduleElement   = new ModuleElement();
     private final List<ModuleEntry> modules         = new ArrayList<>();
 
-    // ── Скролл и анимация ─────────────────────────────────────────────────
     private float scrollValue  = 0f;
     private float scrollTarget = 0f;
     private float maxScroll    = 0f;
-    private float openAnim     = 0f;  // 0→1 при открытии
+    private float openAnim     = 0f;
 
     public Menu() {
         super(Text.of("Menu"));
         updateCurrentModules();
     }
 
-    // ── Категории ─────────────────────────────────────────────────────────
+    /** КРИТИЧНО: убираем blur Minecraft 1.21 */
+    @Override
+    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+        // пусто — блюр убран
+    }
 
     private void updateCurrentModules() {
         modules.clear();
@@ -73,23 +72,18 @@ public class Menu extends Screen {
     private void updateMaxScroll() {
         int[] colH = new int[COLS];
         for (int i = 0; i < modules.size(); i++)
-            colH[i % COLS] += (int) (moduleElement.getHeight() + PADDING);
+            colH[i % COLS] += (int)(moduleElement.getHeight() + PADDING);
         int maxColH = 0;
         for (int h : colH) maxColH = Math.max(maxColH, h);
         maxScroll = Math.max(0f, maxColH - CONTENT_H + PADDING);
     }
 
-    // ── Координаты ────────────────────────────────────────────────────────
-
     private float screenX() {
         return (MinecraftClient.getInstance().getWindow().getScaledWidth()  - CONTENT_W) / 2f;
     }
-
     private float screenY() {
         return (MinecraftClient.getInstance().getWindow().getScaledHeight() - TOTAL_H)   / 2f;
     }
-
-    // ── Tick ──────────────────────────────────────────────────────────────
 
     @Override
     public void tick() {
@@ -99,27 +93,23 @@ public class Menu extends Screen {
         updateMaxScroll();
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // RENDER
-    // ══════════════════════════════════════════════════════════════════════
-
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        MatrixStack ms  = ctx.getMatrices();
-        float x   = screenX();
-        float y   = screenY();
-        float cy  = y + HEADER_H;          // верх контентной зоны
-        float fy  = cy + CONTENT_H;        // верх футера
-        int   a   = (int) (255 * openAnim);
+        MatrixStack ms = ctx.getMatrices();
+        float x  = screenX();
+        float y  = screenY();
+        float cy = y + HEADER_H;
+        float fy = cy + CONTENT_H;
+        int   a  = (int)(255 * openAnim);
 
-        // ── 1. Тёмный оверлей на весь экран ─────────────────────────────
+        // Тёмный оверлей (НЕ blur)
         DrawHelper.drawRect(ctx, 0, 0,
             MinecraftClient.getInstance().getWindow().getScaledWidth(),
             MinecraftClient.getInstance().getWindow().getScaledHeight(),
-            new Color(0, 0, 0, (int) (130 * openAnim)));
+            new Color(0, 0, 0, (int)(130 * openAnim)));
 
-        // ── 2. Анимация scale при открытии ───────────────────────────────
-        float sc = 0.93f + openAnim * 0.07f;
+        // Анимация scale при открытии
+        float sc = 0.94f + openAnim * 0.06f;
         ms.push();
         ms.translate(x + CONTENT_W / 2f, y + TOTAL_H / 2f, 0);
         ms.scale(sc, sc, 1f);
@@ -127,51 +117,48 @@ public class Menu extends Screen {
 
         Matrix4f m = ms.peek().getPositionMatrix();
 
-        // ── 3. Внешнее свечение (glow) ───────────────────────────────────
-        DrawHelper.drawGlow(m, x, y, CONTENT_W, TOTAL_H, 20, 10,
-            new Color(125, 136, 255, (int) (50 * openAnim)));
+        // Glow вокруг всего меню
+        DrawHelper.drawGlow(m, x, y, CONTENT_W, TOTAL_H, 20, 14,
+            new Color(80, 90, 200, (int)(40 * openAnim)));
 
-        // ── 4. HEADER ─────────────────────────────────────────────────────
-        // Скруглённые только верхние углы
-        DrawHelper.drawStyledRect(m, x, y, CONTENT_W, HEADER_H, 20, 20, 0, 0,
-            new Color(29, 31, 44, (int) (218 * openAnim)));
-        // Лёгкий синеватый градиент слева (акцент)
-        DrawHelper.drawGradientH(m, x, y, CONTENT_W * 0.4f, HEADER_H,
-            new Color(51, 56, 94, (int) (65 * openAnim)),
-            new Color(29, 31, 44, 0));
+        // ── HEADER ───────────────────────────────────────────────────────
+        DrawHelper.drawStyledRect(m, x, y, CONTENT_W, HEADER_H, 14, 14, 0, 0,
+            new Color(24, 26, 36, a));
+        DrawHelper.drawGradientH(m, x, y, CONTENT_W * 0.45f, HEADER_H,
+            new Color(60, 66, 110, (int)(55 * openAnim)),
+            new Color(24, 26, 36, 0));
 
         float textY  = y + (HEADER_H - Fonts.height()) / 2f;
-        float logoXE = x + 12 + Fonts.boldWidth("Funtime");
-
-        // Логотип
         DrawHelper.drawTextBoldShadow(ctx, "Funtime", x + 12, textY, new Color(197, 200, 255, a));
-        DrawHelper.drawTextShadow(ctx, " Helper",     logoXE, textY, new Color(125, 136, 255, a));
+        DrawHelper.drawTextShadow(ctx, " Helper", x + 12 + Fonts.boldWidth("Funtime"), textY,
+            new Color(125, 136, 255, a));
 
-        // Название категории по центру
         String catName = categoryElement.getSelectedCategory().getDisplayName();
         DrawHelper.drawText(ctx, catName,
             x + (CONTENT_W - Fonts.width(catName)) / 2f, textY,
-            new Color(141, 144, 199, a));
+            new Color(130, 133, 180, a));
 
-        // Версия справа
         String ver = "v1.0 / 1.21.4";
         DrawHelper.drawText(ctx, ver,
             x + CONTENT_W - Fonts.width(ver) - 12, textY,
-            new Color(65, 68, 100, a));
+            new Color(55, 58, 88, a));
 
-        // ── 5. CONTENT ────────────────────────────────────────────────────
-        DrawHelper.drawRect(m, x, cy, CONTENT_W, CONTENT_H, 0, new Color(17, 19, 24, a));
+        // ── CONTENT ──────────────────────────────────────────────────────
+        DrawHelper.drawRect(m, x, cy, CONTENT_W, CONTENT_H, 0, new Color(15, 17, 22, a));
 
-        // Scissor — модули рисуются только внутри контентной зоны
-        ctx.enableScissor((int) x, (int) cy, (int) (x + CONTENT_W), (int) fy);
-        renderModules(ctx, ms, (int) (x + PADDING), (int) (cy + PADDING), mouseX, mouseY);
+        // Разделитель header/content
+        DrawHelper.drawRect(m, x, cy, CONTENT_W, 1, 0, new Color(45, 44, 65, a));
+
+        // Scissor
+        ctx.enableScissor((int)x, (int)cy, (int)(x + CONTENT_W), (int)fy);
+        renderModules(ctx, ms, (int)(x + PADDING), (int)(cy + PADDING), mouseX, mouseY);
         ctx.disableScissor();
 
-        // Верхний и нижний fade (чтобы модули красиво уходили за края)
-        DrawHelper.drawGradientV(ctx, x, cy, CONTENT_W, 14,
-            new Color(17, 19, 24, a), new Color(17, 19, 24, 0));
-        DrawHelper.drawGradientV(ctx, x, fy - 14, CONTENT_W, 14,
-            new Color(17, 19, 24, 0), new Color(17, 19, 24, a));
+        // Fade сверху/снизу
+        DrawHelper.drawGradientV(ctx, x, cy, CONTENT_W, 12,
+            new Color(15, 17, 22, a), new Color(15, 17, 22, 0));
+        DrawHelper.drawGradientV(ctx, x, fy - 12, CONTENT_W, 12,
+            new Color(15, 17, 22, 0), new Color(15, 17, 22, a));
 
         // Scrollbar
         if (maxScroll > 1f) {
@@ -179,58 +166,33 @@ public class Menu extends Screen {
             float tmbH = Math.max(14, trkH * CONTENT_H / (CONTENT_H + maxScroll));
             float prog  = scrollValue / maxScroll;
             float tmbY  = cy + 5 + prog * (trkH - tmbH);
-            // Трек
-            DrawHelper.drawRect(m, x + CONTENT_W - 5, cy + 5, 3, trkH, 2,
-                new Color(28, 30, 42, a));
-            // Ползунок
-            DrawHelper.drawRect(m, x + CONTENT_W - 5, tmbY,   3, tmbH, 2,
-                new Color(125, 136, 255, a));
+            DrawHelper.drawRect(m, x + CONTENT_W - 5, cy + 5, 3, trkH, 2, new Color(28, 30, 42, a));
+            DrawHelper.drawRect(m, x + CONTENT_W - 5, tmbY,   3, tmbH, 2, new Color(125, 136, 255, a));
         }
 
-        // Разделитель header/content
-        DrawHelper.drawRect(m, x, cy, CONTENT_W, 1, 0, new Color(50, 49, 66, a));
-        // Разделитель content/footer
-        DrawHelper.drawRect(m, x, fy, CONTENT_W, 1, 0, new Color(50, 49, 66, a));
-
-        // ── 6. FOOTER ─────────────────────────────────────────────────────
-        // Скруглённые только нижние углы
-        DrawHelper.drawStyledRect(m, x, fy, CONTENT_W, FOOTER_H, 0, 0, 20, 20,
-            new Color(29, 31, 44, (int) (218 * openAnim)));
-        DrawHelper.drawGradientH(m, x, fy, CONTENT_W * 0.4f, FOOTER_H,
-            new Color(51, 56, 94, (int) (45 * openAnim)),
-            new Color(29, 31, 44, 0));
+        // ── FOOTER ───────────────────────────────────────────────────────
+        DrawHelper.drawRect(m, x, fy, CONTENT_W, 1, 0, new Color(45, 44, 65, a));
+        DrawHelper.drawStyledRect(m, x, fy, CONTENT_W, FOOTER_H, 0, 0, 14, 14,
+            new Color(24, 26, 36, a));
+        DrawHelper.drawGradientH(m, x, fy, CONTENT_W * 0.45f, FOOTER_H,
+            new Color(50, 56, 100, (int)(45 * openAnim)),
+            new Color(24, 26, 36, 0));
 
         categoryElement.renderFooter(ctx, x, fy, CONTENT_W, FOOTER_H, openAnim);
 
-        // ── 7. Внешний outline всего меню ────────────────────────────────
+        // Outline всего меню
         DrawHelper.drawOutline(ms, x - 1, y - 1, CONTENT_W + 2, TOTAL_H + 2,
-            20, new Color(52, 51, 64, a), 2);
+            14, new Color(50, 49, 70, a), 2);
 
         ms.pop();
-
-        // НЕ вызываем super.render — там нет ничего нужного для нашего меню,
-        // а renderBackground уже переопределён ниже
     }
-
-    /**
-     * КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: переопределяем этот метод,
-     * чтобы Minecraft НЕ применял стандартный гауссовый блюр экрана.
-     * Свой тёмный оверлей рисуем вручную в render().
-     */
-    @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Намеренно пусто — блюр убран
-    }
-
-    // ── Рендер модулей ────────────────────────────────────────────────────
 
     private void renderModules(DrawContext ctx, MatrixStack ms,
                                int startX, int startY, int mx, int my) {
         int[] colX = new int[COLS];
-        for (int i = 0; i < COLS; i++) colX[i] = startX + i * (int) (MOD_W + PADDING);
-
+        for (int i = 0; i < COLS; i++) colX[i] = startX + i * (int)(MOD_W + PADDING);
         int[] colY = new int[COLS];
-        Arrays.fill(colY, (int) (startY - scrollValue));
+        Arrays.fill(colY, (int)(startY - scrollValue));
 
         float cy  = screenY() + HEADER_H;
         float cy2 = cy + CONTENT_H;
@@ -239,16 +201,11 @@ public class Menu extends Screen {
             int   col  = i % COLS;
             float modY = colY[col];
             float modH = moduleElement.getHeight();
-
-            // Рендерим только видимые модули
-            if (modY + modH >= cy - modH && modY <= cy2 + modH) {
+            if (modY + modH >= cy - modH && modY <= cy2 + modH)
                 moduleElement.render(ctx, ms, colX[col], modY, MOD_W, modules.get(i), mx, my);
-            }
-            colY[col] += (int) (modH + PADDING);
+            colY[col] += (int)(modH + PADDING);
         }
     }
-
-    // ── Input ─────────────────────────────────────────────────────────────
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
@@ -256,7 +213,6 @@ public class Menu extends Screen {
         float cy = screenY() + HEADER_H;
         float fy = cy + CONTENT_H;
 
-        // Footer — выбор категории
         if (mouseY >= fy && mouseY <= fy + FOOTER_H) {
             if (categoryElement.mouseClicked(mouseX, mouseY)) {
                 updateCurrentModules();
@@ -264,21 +220,19 @@ public class Menu extends Screen {
             }
         }
 
-        // Content — клик по модулю
         if (mouseY >= cy && mouseY <= fy) {
             int[] colX = new int[COLS];
-            for (int i = 0; i < COLS; i++) colX[i] = (int) (x + PADDING) + i * (int) (MOD_W + PADDING);
+            for (int i = 0; i < COLS; i++) colX[i] = (int)(x + PADDING) + i*(int)(MOD_W + PADDING);
             int[] colY = new int[COLS];
-            Arrays.fill(colY, (int) (cy + PADDING - scrollValue));
+            Arrays.fill(colY, (int)(cy + PADDING - scrollValue));
 
             for (int i = 0; i < modules.size(); i++) {
                 int col = i % COLS;
                 if (moduleElement.mouseClicked(colX[col], colY[col], MOD_W, modules.get(i), mouseX, mouseY, button))
                     return true;
-                colY[col] += (int) (moduleElement.getHeight() + PADDING);
+                colY[col] += (int)(moduleElement.getHeight() + PADDING);
             }
         }
-
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
@@ -286,9 +240,8 @@ public class Menu extends Screen {
     public boolean mouseScrolled(double mouseX, double mouseY, double h, double v) {
         float x  = screenX();
         float cy = screenY() + HEADER_H;
-        if (mouseX >= x && mouseX <= x + CONTENT_W &&
-            mouseY >= cy && mouseY <= cy + CONTENT_H) {
-            scrollTarget = Math.max(0f, Math.min(maxScroll, scrollTarget - (float) (v * 18)));
+        if (mouseX >= x && mouseX <= x + CONTENT_W && mouseY >= cy && mouseY <= cy + CONTENT_H) {
+            scrollTarget = Math.max(0f, Math.min(maxScroll, scrollTarget - (float)(v * 18)));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, h, v);
@@ -300,18 +253,13 @@ public class Menu extends Screen {
         return super.keyPressed(key, scan, mods);
     }
 
-    @Override
-    public boolean shouldPause() { return false; }
-
-    // ── ModuleEntry — замените реальными модулями вашего клиента ─────────
+    @Override public boolean shouldPause() { return false; }
 
     public static class ModuleEntry {
         public String  name;
         public boolean enabled;
-
         public ModuleEntry(String name, boolean enabled) {
-            this.name    = name;
-            this.enabled = enabled;
+            this.name = name; this.enabled = enabled;
         }
     }
 }
