@@ -8,11 +8,12 @@ import net.minecraft.util.Identifier;
 
 public class Fonts {
 
+    // ИЗМЕНЕНО: вместо "modid" теперь "nocturn-client"
     public static final Identifier BOLD    = Identifier.of("nocturn-client", "inter_bold");
     public static final Identifier MEDIUM  = Identifier.of("nocturn-client", "inter_medium");
     public static final Identifier REGULAR = Identifier.of("nocturn-client", "inter_regular");
 
-    public static TextRenderer get() {
+    public static TextRenderer renderer() {
         return MinecraftClient.getInstance().textRenderer;
     }
 
@@ -28,11 +29,12 @@ public class Fonts {
         return Text.literal(text).setStyle(Style.EMPTY.withFont(REGULAR));
     }
 
-    public static int boldWidth(String text)    { return get().getWidth(bold(text));    }
-    public static int mediumWidth(String text)  { return get().getWidth(medium(text));  }
-    public static int regularWidth(String text) { return get().getWidth(regular(text)); }
+    public static int boldWidth(String text)    { return renderer().getWidth(bold(text)); }
+    public static int mediumWidth(String text)  { return renderer().getWidth(medium(text)); }
+    public static int regularWidth(String text) { return renderer().getWidth(regular(text)); }
 
-    /** По умолчанию используем bold */
-    public static int width(String text)  { return boldWidth(text);      }
-    public static int height()            { return get().fontHeight;      }
+    // Совместимость
+    public static int width(String text)  { return boldWidth(text); }
+    public static int height()            { return renderer().fontHeight; }
+    public static TextRenderer get()      { return renderer(); }
 }
