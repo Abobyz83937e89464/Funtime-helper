@@ -3,48 +3,52 @@ package com.example.util.render;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.ShaderProgram;
+import net.minecraft.client.gl.ShaderProgramKey;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.resource.ResourceManager;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
 
 import java.awt.Color;
-import java.io.IOException;
+import java.util.List;
 
 public class DrawHelper {
 
     // ═══════════════════════════════════════════════════════
-    // SHADER
+    // SHADER KEY — регистрация кастомного шейдера
     // ═══════════════════════════════════════════════════════
 
-    private static ShaderProgram roundedShader;
+    public static final ShaderProgramKey ROUNDED = new ShaderProgramKey(
+        Identifier.of("nocturn-client", "rounded_rect"),
+        VertexFormats.POSITION_TEXTURE,
+        List.of(
+            new ShaderProgramKey.Uniform("u_Resolution",   GlUniform.Type.FLOAT_2, 2,  new float[]{1920f, 1080f}),
+            new ShaderProgramKey.Uniform("u_Rect",         GlUniform.Type.FLOAT_4, 4,  new float[]{0,0,100,100}),
+            new ShaderProgramKey.Uniform("u_Radius",       GlUniform.Type.FLOAT,   1,  new float[]{8f}),
+            new ShaderProgramKey.Uniform("u_Color",        GlUniform.Type.FLOAT_4, 4,  new float[]{1,1,1,1}),
+            new ShaderProgramKey.Uniform("u_OutlineColor", GlUniform.Type.FLOAT_4, 4,  new float[]{0,0,0,0}),
+            new ShaderProgramKey.Uniform("u_OutlineWidth", GlUniform.Type.FLOAT,   1,  new float[]{0f}),
+            new ShaderProgramKey.Uniform("u_GlowColor",    GlUniform.Type.FLOAT_4, 4,  new float[]{0,0,0,0}),
+            new ShaderProgramKey.Uniform("u_GlowRadius",   GlUniform.Type.FLOAT,   1,  new float[]{0f}),
+            new ShaderProgramKey.Uniform("u_Time",         GlUniform.Type.FLOAT,   1,  new float[]{0f})
+        )
+    );
 
-    /**
-     * Вызывается из NocturnClient через ResourceReloadListener
-     */
-    public static void init(ResourceManager rm) {
-        // Удаляем старый шейдер если был
-        if (roundedShader != null) {
-            roundedShader.close();
-            roundedShader = null;
-        }
-        try {
-            roundedShader = new ShaderProgram(
-                rm,
-                Identifier.of("nocturn-client", "rounded_rect"),
-                VertexFormats.POSITION_TEXTURE
-            );
-        } catch (IOException e) {
-            System.err.println("[DrawHelper] Shader load failed: " + e.getMessage());
-            e.printStackTrace();
-        }
+    // ═══════════════════════════════════════════════════════
+    // SHADER HELPERS
+    // ═══════════════════════════════════════════════════════
+
+    private static ShaderProgram getShader() {
+        return MinecraftClient.getInstance()
+                              .gameRenderer
+                              .getProgram(ROUNDED);
     }
 
     private static boolean ok() {
-        return roundedShader != null;
+        return getShader() != null;
     }
 
     // ═══════════════════════════════════════════════════════
@@ -69,7 +73,7 @@ public class DrawHelper {
     }
 
     // ═══════════════════════════════════════════════════════
-    // STYLED RECT
+    // STYLED RECT (разные радиусы углов)
     // ═══════════════════════════════════════════════════════
 
     public static void drawStyledRect(Matrix4f m,
@@ -180,7 +184,7 @@ public class DrawHelper {
                                      Color left, Color right) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
 
         BufferBuilder buf = Tessellator.getInstance().begin(
             VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
@@ -244,7 +248,7 @@ public class DrawHelper {
         if (w <= 0 || h <= 0) return;
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
 
         float r = c.getRed()   / 255f;
         float g = c.getGreen() / 255f;
@@ -272,7 +276,16 @@ public class DrawHelper {
                              Color outlineColor, float outlineWidth,
                              Color glowColor,    float glowRadius,
                              float time) {
-        if (!ok() || w <= 0 || h <= 0) return;
+        if (w <= 0 || h <= 0) return;
+
+        // Если шейдер не загрузился — fallback на простой прямоугольник
+        if (!ok()) {
+            if (fill != null && fill.getAlpha() > 0)
+                drawRectRaw(mat, x, y, w, h, fill);
+            return;
+        }
+
+        ShaderProgram shader = getShader();
 
         RenderSystem.enableBlend();
         RenderSystem.blendFuncSeparate(
@@ -281,33 +294,30 @@ public class DrawHelper {
             GlStateManager.SrcFactor.ONE,
             GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA
         );
-        RenderSystem.setShader(() -> roundedShader);
+        RenderSystem.setShader(ROUNDED);
 
         // Uniforms
-        setUniform2f("u_Resolution", w, h);
-        setUniform4f("u_Rect",       0f, 0f, w, h);
-        setUniform1f("u_Radius",     Math.min(radius, Math.min(w, h) / 2f));
-
         Color fc = fill         != null ? fill         : new Color(0, 0, 0, 0);
         Color oc = outlineColor != null ? outlineColor : new Color(0, 0, 0, 0);
         Color gc = glowColor    != null ? glowColor    : new Color(0, 0, 0, 0);
 
-        setUniform4f("u_Color",
+        setU2f(shader, "u_Resolution", w, h);
+        setU4f(shader, "u_Rect",       0f, 0f, w, h);
+        setU1f(shader, "u_Radius",     Math.min(radius, Math.min(w, h) / 2f));
+        setU4f(shader, "u_Color",
             fc.getRed()/255f, fc.getGreen()/255f,
             fc.getBlue()/255f, fc.getAlpha()/255f);
-        setUniform4f("u_OutlineColor",
+        setU4f(shader, "u_OutlineColor",
             oc.getRed()/255f, oc.getGreen()/255f,
             oc.getBlue()/255f, oc.getAlpha()/255f);
-        setUniform1f("u_OutlineWidth",
+        setU1f(shader, "u_OutlineWidth",
             outlineColor != null ? outlineWidth : 0f);
-        setUniform4f("u_GlowColor",
+        setU4f(shader, "u_GlowColor",
             gc.getRed()/255f, gc.getGreen()/255f,
             gc.getBlue()/255f, gc.getAlpha()/255f);
-        setUniform1f("u_GlowRadius",
+        setU1f(shader, "u_GlowRadius",
             glowColor != null ? glowRadius : 0f);
-        setUniform1f("u_Time", time < 0f ? 0f : time);
-
-        roundedShader.bind();
+        setU1f(shader, "u_Time", time < 0f ? 0f : time);
 
         BufferBuilder buf = Tessellator.getInstance().begin(
             VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
@@ -317,7 +327,6 @@ public class DrawHelper {
         buf.vertex(mat, x + w, y,     0).texture(1f, 0f);
         BufferRenderer.drawWithGlobalProgram(buf.end());
 
-        roundedShader.unbind();
         RenderSystem.disableBlend();
     }
 
@@ -325,20 +334,20 @@ public class DrawHelper {
     // UNIFORM HELPERS
     // ═══════════════════════════════════════════════════════
 
-    private static void setUniform1f(String name, float a) {
-        var u = roundedShader.getUniformOrDefault(name);
+    private static void setU1f(ShaderProgram s, String name, float a) {
+        GlUniform u = s.getUniform(name);
         if (u != null) u.set(a);
     }
 
-    private static void setUniform2f(String name, float a, float b) {
-        var u = roundedShader.getUniformOrDefault(name);
+    private static void setU2f(ShaderProgram s, String name,
+                                float a, float b) {
+        GlUniform u = s.getUniform(name);
         if (u != null) u.set(a, b);
     }
 
-    private static void setUniform4f(String name,
-                                     float a, float b,
-                                     float c, float d) {
-        var u = roundedShader.getUniformOrDefault(name);
+    private static void setU4f(ShaderProgram s, String name,
+                                float a, float b, float c, float d) {
+        GlUniform u = s.getUniform(name);
         if (u != null) u.set(a, b, c, d);
     }
-}
+                         }
