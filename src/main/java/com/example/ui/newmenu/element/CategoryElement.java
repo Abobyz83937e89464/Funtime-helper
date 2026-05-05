@@ -21,9 +21,7 @@ public class CategoryElement {
         MISC("Misc");
 
         private final String displayName;
-
         Category(String d) { this.displayName = d; }
-
         public String getDisplayName() { return displayName; }
     }
 
@@ -51,29 +49,26 @@ public class CategoryElement {
         return false;
     }
 
-    public void renderFooter(DrawContext ctx,
-                             float x, float y,
-                             float footerW, float footerH,
-                             float openAnim) {
+    public void renderFooter(DrawContext ctx, float x, float y,
+                             float footerW, float footerH, float openAnim) {
         MatrixStack ms = ctx.getMatrices();
         Matrix4f m = ms.peek().getPositionMatrix();
         categoryBounds.clear();
 
         Category[] cats = Category.values();
 
-        final float BTN_H   = 20f;
-        final float BTN_PAD = 10f;
-        final float BTN_GAP = 6f;
+        float btnH   = 20f;
+        float btnPad = 10f;
+        float btnGap = 6f;
 
-        // Считаем суммарную ширину
         float totalWidth = 0f;
         for (int i = 0; i < cats.length; i++) {
-            totalWidth += Fonts.width(cats[i].getDisplayName()) + BTN_PAD * 2f;
-            if (i < cats.length - 1) totalWidth += BTN_GAP;
+            totalWidth += Fonts.width(cats[i].getDisplayName()) + btnPad * 2;
+            if (i < cats.length - 1) totalWidth += btnGap;
         }
 
         float curX = x + (footerW - totalWidth) / 2f;
-        float btnY = y + (footerH - BTN_H) / 2f;
+        float btnY = y + (footerH - btnH) / 2f;
         int   a    = (int)(255 * openAnim);
 
         for (Category cat : cats) {
@@ -83,37 +78,33 @@ public class CategoryElement {
             anim += (target - anim) * 0.12f;
             colorAnims.put(cat, anim);
 
-            float btnW = Fonts.width(cat.getDisplayName()) + BTN_PAD * 2f;
-            float rad  = BTN_H / 2f;
+            float btnW = Fonts.width(cat.getDisplayName()) + btnPad * 2;
+            float rad  = btnH / 2f;
 
             // Glow под выбранной кнопкой
             if (anim > 0.02f) {
-                DrawHelper.drawGlow(m, curX, btnY, btnW, BTN_H, rad, 8,
-                    new Color(125, 136, 255,
-                        (int)(40 * anim * openAnim)));
+                DrawHelper.drawGlow(m, curX, btnY, btnW, btnH, rad, 8,
+                    new Color(125, 136, 255, (int)(40 * anim * openAnim)));
             }
 
             // Фон кнопки
-            int bgAlpha = (int)(Math.max(anim, 0.12f) * 180f * openAnim);
-            DrawHelper.drawRect(m, curX, btnY, btnW, BTN_H, rad,
+            int bgAlpha = (int)(Math.max(anim, 0.12f) * 180 * openAnim);
+            DrawHelper.drawRect(m, curX, btnY, btnW, btnH, rad,
                 new Color(35, 37, 55, bgAlpha));
 
             if (anim > 0.02f) {
-                // Outline выбранной кнопки
-                DrawHelper.drawOutline(ms, curX, btnY, btnW, BTN_H, rad,
-                    new Color(100, 110, 230,
-                        (int)(130 * anim * openAnim)), 1f);
+                // Outline выбранной
+                DrawHelper.drawOutline(ms, curX, btnY, btnW, btnH, rad,
+                    new Color(100, 110, 230, (int)(130 * anim * openAnim)), 1);
 
                 // Нижняя линия-акцент
                 float lw = (btnW - 8f) * anim;
                 float lx = curX + (btnW - lw) / 2f;
-                DrawHelper.drawRect(m, lx, btnY + BTN_H - 2f, lw, 2f, 1f,
-                    new Color(125, 136, 255,
-                        (int)(240 * anim * openAnim)));
+                DrawHelper.drawRect(m, lx, btnY + btnH - 2f, lw, 2f, 1f,
+                    new Color(125, 136, 255, (int)(240 * anim * openAnim)));
                 // Glow под линией
-                DrawHelper.drawRect(m, lx, btnY + BTN_H - 6f, lw, 6f, 1f,
-                    new Color(125, 136, 255,
-                        (int)(30 * anim * openAnim)));
+                DrawHelper.drawRect(m, lx, btnY + btnH - 6f, lw, 6f, 1f,
+                    new Color(125, 136, 255, (int)(30 * anim * openAnim)));
             }
 
             // Цвет текста — lerp
@@ -124,12 +115,11 @@ public class CategoryElement {
             int tb = (int)(norC.getBlue()  + (selC.getBlue()  - norC.getBlue())  * anim);
 
             float tx = curX + (btnW - Fonts.width(cat.getDisplayName())) / 2f;
-            float ty = btnY + (footerH - Fonts.height()) / 2f;
-            DrawHelper.drawText(ctx, cat.getDisplayName(), tx, ty,
-                new Color(tr, tg, tb, a));
+            float ty = btnY + (btnH - Fonts.height()) / 2f;
+            DrawHelper.drawText(ctx, cat.getDisplayName(), tx, ty, new Color(tr, tg, tb, a));
 
-            categoryBounds.put(cat, new float[]{ curX, btnY, btnW, BTN_H });
-            curX += btnW + BTN_GAP;
+            categoryBounds.put(cat, new float[]{ curX, btnY, btnW, btnH });
+            curX += btnW + btnGap;
         }
     }
 }
