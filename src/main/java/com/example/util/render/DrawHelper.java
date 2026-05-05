@@ -2,7 +2,6 @@ package com.example.util.render;
 
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
@@ -18,20 +17,19 @@ import java.util.Objects;
 public class DrawHelper {
 
     // ═══════════════════════════════════════════════════════
-    // SHADER
+    // SHADER — чистый GL20, без Minecraft ShaderProgram API
     // ═══════════════════════════════════════════════════════
 
-    private static int prog      = -1;
-    private static boolean dead  = false;
+    private static int  prog = -1;
+    private static boolean dead = false;
 
-    /** Вызов из NocturnClient.onInitializeClient() */
     public static void initShader() {
         if (prog != -1 || dead) return;
         try {
             int vs = compileShader(GL20.GL_VERTEX_SHADER,
-                read("/assets/nocturn-client/shaders/core/rounded_rect.vsh"));
+                readRes("/assets/nocturn-client/shaders/core/rounded_rect.vsh"));
             int fs = compileShader(GL20.GL_FRAGMENT_SHADER,
-                read("/assets/nocturn-client/shaders/core/rounded_rect.fsh"));
+                readRes("/assets/nocturn-client/shaders/core/rounded_rect.fsh"));
 
             prog = GL20.glCreateProgram();
             GL20.glAttachShader(prog, vs);
@@ -41,15 +39,13 @@ public class DrawHelper {
             GL20.glLinkProgram(prog);
 
             if (GL20.glGetProgrami(prog, GL20.GL_LINK_STATUS) == GL11.GL_FALSE) {
-                System.err.println("[DrawHelper] Link: "
+                System.err.println("[DrawHelper] Link error: "
                     + GL20.glGetProgramInfoLog(prog));
-                dead = true;
-                prog = -1;
-                return;
+                dead = true; prog = -1; return;
             }
             GL20.glDeleteShader(vs);
             GL20.glDeleteShader(fs);
-            System.out.println("[DrawHelper] Shader OK id=" + prog);
+            System.out.println("[DrawHelper] Shader OK, id=" + prog);
 
         } catch (Exception e) {
             System.err.println("[DrawHelper] initShader failed: " + e.getMessage());
@@ -62,37 +58,38 @@ public class DrawHelper {
         GL20.glShaderSource(id, src);
         GL20.glCompileShader(id);
         if (GL20.glGetShaderi(id, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE)
-            System.err.println("[DrawHelper] Compile error:\n"
+            System.err.println("[DrawHelper] Shader compile error:\n"
                 + GL20.glGetShaderInfoLog(id));
         return id;
     }
 
-    private static String read(String path) throws Exception {
+    private static String readRes(String path) throws Exception {
         try (InputStream is = Objects.requireNonNull(
                 DrawHelper.class.getResourceAsStream(path),
-                "Resource not found: " + path)) {
+                "Not found: " + path)) {
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 
     private static boolean ok() { return prog != -1; }
 
-    // ═══════════════════════════════════════════════════════
-    // UNIFORM HELPERS
-    // ═══════════════════════════════════════════════════════
+    // ── Uniform helpers ───────────────────────────────────────────────────
 
     private static void u1f(String n, float a) {
         int l = GL20.glGetUniformLocation(prog, n);
         if (l >= 0) GL20.glUniform1f(l, a);
     }
+
     private static void u2f(String n, float a, float b) {
         int l = GL20.glGetUniformLocation(prog, n);
         if (l >= 0) GL20.glUniform2f(l, a, b);
     }
+
     private static void u4f(String n, float a, float b, float c, float d) {
         int l = GL20.glGetUniformLocation(prog, n);
         if (l >= 0) GL20.glUniform4f(l, a, b, c, d);
     }
+
     private static void uMat4(String n, Matrix4f mat) {
         int l = GL20.glGetUniformLocation(prog, n);
         if (l >= 0) {
@@ -103,7 +100,7 @@ public class DrawHelper {
     }
 
     // ═══════════════════════════════════════════════════════
-    // CORE SDF DRAW
+    // CORE SDF
     // ═══════════════════════════════════════════════════════
 
     private static void sdf(Matrix4f mat,
@@ -115,7 +112,6 @@ public class DrawHelper {
                              float time) {
         if (w <= 0 || h <= 0) return;
 
-        // Fallback если шейдер не загрузился
         if (!ok()) {
             if (fill != null && fill.getAlpha() > 0)
                 drawRectRaw(mat, x, y, w, h, fill);
@@ -126,7 +122,6 @@ public class DrawHelper {
         Color oc = outlineColor != null ? outlineColor : new Color(0,0,0,0);
         Color gc = glowColor    != null ? glowColor    : new Color(0,0,0,0);
 
-        // Сохраняем GL состояние
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFuncSeparate(
             GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA,
@@ -134,15 +129,11 @@ public class DrawHelper {
 
         GL20.glUseProgram(prog);
 
-        // Матрицы
         uMat4("ModelViewMat", RenderSystem.getModelViewMatrix());
         uMat4("ProjMat",      RenderSystem.getProjectionMatrix());
-
-        // Uniforms
         u2f("u_Resolution", w, h);
         u4f("u_Rect",       0, 0, w, h);
         u1f("u_Radius",     Math.min(radius, Math.min(w, h) / 2f));
-
         u4f("u_Color",
             fc.getRed()/255f, fc.getGreen()/255f,
             fc.getBlue()/255f, fc.getAlpha()/255f);
@@ -156,7 +147,6 @@ public class DrawHelper {
         u1f("u_GlowRadius", glowColor != null ? glowRadius : 0f);
         u1f("u_Time",       time < 0f ? 0f : time);
 
-        // Рисуем quad
         BufferBuilder buf = Tessellator.getInstance().begin(
             VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
         buf.vertex(mat, x,     y,     0).texture(0f, 0f);
@@ -279,8 +269,9 @@ public class DrawHelper {
     public static void drawGradientH(Matrix4f m,
                                      float x, float y, float w, float h,
                                      Color left, Color right) {
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
 
         BufferBuilder buf = Tessellator.getInstance().begin(
@@ -298,7 +289,7 @@ public class DrawHelper {
            .color(left.getRed(),  left.getGreen(),
                   left.getBlue(),  left.getAlpha());
         BufferRenderer.drawWithGlobalProgram(buf.end());
-        RenderSystem.disableBlend();
+        GL11.glDisable(GL11.GL_BLEND);
     }
 
     // ═══════════════════════════════════════════════════════
@@ -343,8 +334,10 @@ public class DrawHelper {
                                    float x, float y, float w, float h,
                                    Color c) {
         if (w <= 0 || h <= 0) return;
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
 
         float r = c.getRed()   / 255f;
@@ -359,6 +352,7 @@ public class DrawHelper {
         buf.vertex(m, x + w, y,     0).color(r, g, b, a);
         buf.vertex(m, x,     y,     0).color(r, g, b, a);
         BufferRenderer.drawWithGlobalProgram(buf.end());
-        RenderSystem.disableBlend();
+
+        GL11.glDisable(GL11.GL_BLEND);
     }
 }
