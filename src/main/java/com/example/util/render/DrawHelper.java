@@ -3,56 +3,174 @@ package com.example.util.render;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.GlUniform;
-import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.gl.ShaderProgramKey;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
 
 import java.awt.Color;
-import java.util.List;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 
 public class DrawHelper {
 
     // ═══════════════════════════════════════════════════════
-    // SHADER KEY — регистрация кастомного шейдера
+    // SHADER
     // ═══════════════════════════════════════════════════════
 
-    public static final ShaderProgramKey ROUNDED = new ShaderProgramKey(
-        Identifier.of("nocturn-client", "rounded_rect"),
-        VertexFormats.POSITION_TEXTURE,
-        List.of(
-            new ShaderProgramKey.Uniform("u_Resolution",   GlUniform.Type.FLOAT_2, 2,  new float[]{1920f, 1080f}),
-            new ShaderProgramKey.Uniform("u_Rect",         GlUniform.Type.FLOAT_4, 4,  new float[]{0,0,100,100}),
-            new ShaderProgramKey.Uniform("u_Radius",       GlUniform.Type.FLOAT,   1,  new float[]{8f}),
-            new ShaderProgramKey.Uniform("u_Color",        GlUniform.Type.FLOAT_4, 4,  new float[]{1,1,1,1}),
-            new ShaderProgramKey.Uniform("u_OutlineColor", GlUniform.Type.FLOAT_4, 4,  new float[]{0,0,0,0}),
-            new ShaderProgramKey.Uniform("u_OutlineWidth", GlUniform.Type.FLOAT,   1,  new float[]{0f}),
-            new ShaderProgramKey.Uniform("u_GlowColor",    GlUniform.Type.FLOAT_4, 4,  new float[]{0,0,0,0}),
-            new ShaderProgramKey.Uniform("u_GlowRadius",   GlUniform.Type.FLOAT,   1,  new float[]{0f}),
-            new ShaderProgramKey.Uniform("u_Time",         GlUniform.Type.FLOAT,   1,  new float[]{0f})
-        )
-    );
+    private static int prog      = -1;
+    private static boolean dead  = false;
 
-    // ═══════════════════════════════════════════════════════
-    // SHADER HELPERS
-    // ═══════════════════════════════════════════════════════
+    /** Вызов из NocturnClient.onInitializeClient() */
+    public static void initShader() {
+        if (prog != -1 || dead) return;
+        try {
+            int vs = compileShader(GL20.GL_VERTEX_SHADER,
+                read("/assets/nocturn-client/shaders/core/rounded_rect.vsh"));
+            int fs = compileShader(GL20.GL_FRAGMENT_SHADER,
+                read("/assets/nocturn-client/shaders/core/rounded_rect.fsh"));
 
-    private static ShaderProgram getShader() {
-        return MinecraftClient.getInstance()
-                              .gameRenderer
-                              .getProgram(ROUNDED);
+            prog = GL20.glCreateProgram();
+            GL20.glAttachShader(prog, vs);
+            GL20.glAttachShader(prog, fs);
+            GL20.glBindAttribLocation(prog, 0, "Position");
+            GL20.glBindAttribLocation(prog, 1, "UV0");
+            GL20.glLinkProgram(prog);
+
+            if (GL20.glGetProgrami(prog, GL20.GL_LINK_STATUS) == GL11.GL_FALSE) {
+                System.err.println("[DrawHelper] Link: "
+                    + GL20.glGetProgramInfoLog(prog));
+                dead = true;
+                prog = -1;
+                return;
+            }
+            GL20.glDeleteShader(vs);
+            GL20.glDeleteShader(fs);
+            System.out.println("[DrawHelper] Shader OK id=" + prog);
+
+        } catch (Exception e) {
+            System.err.println("[DrawHelper] initShader failed: " + e.getMessage());
+            dead = true;
+        }
     }
 
-    private static boolean ok() {
-        return getShader() != null;
+    private static int compileShader(int type, String src) {
+        int id = GL20.glCreateShader(type);
+        GL20.glShaderSource(id, src);
+        GL20.glCompileShader(id);
+        if (GL20.glGetShaderi(id, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE)
+            System.err.println("[DrawHelper] Compile error:\n"
+                + GL20.glGetShaderInfoLog(id));
+        return id;
+    }
+
+    private static String read(String path) throws Exception {
+        try (InputStream is = Objects.requireNonNull(
+                DrawHelper.class.getResourceAsStream(path),
+                "Resource not found: " + path)) {
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static boolean ok() { return prog != -1; }
+
+    // ═══════════════════════════════════════════════════════
+    // UNIFORM HELPERS
+    // ═══════════════════════════════════════════════════════
+
+    private static void u1f(String n, float a) {
+        int l = GL20.glGetUniformLocation(prog, n);
+        if (l >= 0) GL20.glUniform1f(l, a);
+    }
+    private static void u2f(String n, float a, float b) {
+        int l = GL20.glGetUniformLocation(prog, n);
+        if (l >= 0) GL20.glUniform2f(l, a, b);
+    }
+    private static void u4f(String n, float a, float b, float c, float d) {
+        int l = GL20.glGetUniformLocation(prog, n);
+        if (l >= 0) GL20.glUniform4f(l, a, b, c, d);
+    }
+    private static void uMat4(String n, Matrix4f mat) {
+        int l = GL20.glGetUniformLocation(prog, n);
+        if (l >= 0) {
+            float[] buf = new float[16];
+            mat.get(buf);
+            GL20.glUniformMatrix4fv(l, false, buf);
+        }
     }
 
     // ═══════════════════════════════════════════════════════
-    // DRAW RECT
+    // CORE SDF DRAW
+    // ═══════════════════════════════════════════════════════
+
+    private static void sdf(Matrix4f mat,
+                             float x, float y, float w, float h,
+                             float radius,
+                             Color fill,
+                             Color outlineColor, float outlineWidth,
+                             Color glowColor,    float glowRadius,
+                             float time) {
+        if (w <= 0 || h <= 0) return;
+
+        // Fallback если шейдер не загрузился
+        if (!ok()) {
+            if (fill != null && fill.getAlpha() > 0)
+                drawRectRaw(mat, x, y, w, h, fill);
+            return;
+        }
+
+        Color fc = fill         != null ? fill         : new Color(0,0,0,0);
+        Color oc = outlineColor != null ? outlineColor : new Color(0,0,0,0);
+        Color gc = glowColor    != null ? glowColor    : new Color(0,0,0,0);
+
+        // Сохраняем GL состояние
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFuncSeparate(
+            GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA,
+            GL11.GL_ONE,       GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+        GL20.glUseProgram(prog);
+
+        // Матрицы
+        uMat4("ModelViewMat", RenderSystem.getModelViewMatrix());
+        uMat4("ProjMat",      RenderSystem.getProjectionMatrix());
+
+        // Uniforms
+        u2f("u_Resolution", w, h);
+        u4f("u_Rect",       0, 0, w, h);
+        u1f("u_Radius",     Math.min(radius, Math.min(w, h) / 2f));
+
+        u4f("u_Color",
+            fc.getRed()/255f, fc.getGreen()/255f,
+            fc.getBlue()/255f, fc.getAlpha()/255f);
+        u4f("u_OutlineColor",
+            oc.getRed()/255f, oc.getGreen()/255f,
+            oc.getBlue()/255f, oc.getAlpha()/255f);
+        u1f("u_OutlineWidth", outlineColor != null ? outlineWidth : 0f);
+        u4f("u_GlowColor",
+            gc.getRed()/255f, gc.getGreen()/255f,
+            gc.getBlue()/255f, gc.getAlpha()/255f);
+        u1f("u_GlowRadius", glowColor != null ? glowRadius : 0f);
+        u1f("u_Time",       time < 0f ? 0f : time);
+
+        // Рисуем quad
+        BufferBuilder buf = Tessellator.getInstance().begin(
+            VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+        buf.vertex(mat, x,     y,     0).texture(0f, 0f);
+        buf.vertex(mat, x,     y + h, 0).texture(0f, 1f);
+        buf.vertex(mat, x + w, y + h, 0).texture(1f, 1f);
+        buf.vertex(mat, x + w, y,     0).texture(1f, 0f);
+        BufferRenderer.drawWithGlobalProgram(buf.end());
+
+        GL20.glUseProgram(0);
+        GL11.glDisable(GL11.GL_BLEND);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // PUBLIC API
     // ═══════════════════════════════════════════════════════
 
     public static void drawRect(Matrix4f m, float x, float y,
@@ -71,10 +189,6 @@ public class DrawHelper {
         drawRect(ctx.getMatrices().peek().getPositionMatrix(),
                  x, y, w, h, 0f, color);
     }
-
-    // ═══════════════════════════════════════════════════════
-    // STYLED RECT (разные радиусы углов)
-    // ═══════════════════════════════════════════════════════
 
     public static void drawStyledRect(Matrix4f m,
                                       float x, float y, float w, float h,
@@ -98,10 +212,6 @@ public class DrawHelper {
         if (br == 0 && botR > 0) drawRectRaw(m, x + w - botR, y + h - botR, botR, botR, color);
     }
 
-    // ═══════════════════════════════════════════════════════
-    // OUTLINE
-    // ═══════════════════════════════════════════════════════
-
     public static void drawOutline(MatrixStack ms,
                                    float x, float y, float w, float h,
                                    float radius, Color color, float thickness) {
@@ -114,10 +224,6 @@ public class DrawHelper {
             null, 0f, -1f);
     }
 
-    // ═══════════════════════════════════════════════════════
-    // GLOW
-    // ═══════════════════════════════════════════════════════
-
     public static void drawGlow(Matrix4f m,
                                 float x, float y, float w, float h,
                                 float radius, float spread, Color color) {
@@ -127,13 +233,8 @@ public class DrawHelper {
             radius + spread,
             new Color(0, 0, 0, 0),
             null, 0f,
-            color, spread,
-            -1f);
+            color, spread, -1f);
     }
-
-    // ═══════════════════════════════════════════════════════
-    // SHIMMER
-    // ═══════════════════════════════════════════════════════
 
     public static void drawShimmer(Matrix4f m,
                                    float x, float y, float w, float h,
@@ -141,10 +242,6 @@ public class DrawHelper {
         float time = (System.currentTimeMillis() % 100_000L) / 1000f;
         sdf(m, x, y, w, h, radius, baseColor, null, 0f, null, 0f, time);
     }
-
-    // ═══════════════════════════════════════════════════════
-    // CIRCLE
-    // ═══════════════════════════════════════════════════════
 
     public static void drawCircle(Matrix4f m,
                                   float cx, float cy,
@@ -184,7 +281,7 @@ public class DrawHelper {
                                      Color left, Color right) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
 
         BufferBuilder buf = Tessellator.getInstance().begin(
             VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
@@ -248,7 +345,7 @@ public class DrawHelper {
         if (w <= 0 || h <= 0) return;
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
 
         float r = c.getRed()   / 255f;
         float g = c.getGreen() / 255f;
@@ -264,90 +361,4 @@ public class DrawHelper {
         BufferRenderer.drawWithGlobalProgram(buf.end());
         RenderSystem.disableBlend();
     }
-
-    // ═══════════════════════════════════════════════════════
-    // CORE SDF
-    // ═══════════════════════════════════════════════════════
-
-    private static void sdf(Matrix4f mat,
-                             float x, float y, float w, float h,
-                             float radius,
-                             Color fill,
-                             Color outlineColor, float outlineWidth,
-                             Color glowColor,    float glowRadius,
-                             float time) {
-        if (w <= 0 || h <= 0) return;
-
-        // Если шейдер не загрузился — fallback на простой прямоугольник
-        if (!ok()) {
-            if (fill != null && fill.getAlpha() > 0)
-                drawRectRaw(mat, x, y, w, h, fill);
-            return;
-        }
-
-        ShaderProgram shader = getShader();
-
-        RenderSystem.enableBlend();
-        RenderSystem.blendFuncSeparate(
-            GlStateManager.SrcFactor.SRC_ALPHA,
-            GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA,
-            GlStateManager.SrcFactor.ONE,
-            GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA
-        );
-        RenderSystem.setShader(ROUNDED);
-
-        // Uniforms
-        Color fc = fill         != null ? fill         : new Color(0, 0, 0, 0);
-        Color oc = outlineColor != null ? outlineColor : new Color(0, 0, 0, 0);
-        Color gc = glowColor    != null ? glowColor    : new Color(0, 0, 0, 0);
-
-        setU2f(shader, "u_Resolution", w, h);
-        setU4f(shader, "u_Rect",       0f, 0f, w, h);
-        setU1f(shader, "u_Radius",     Math.min(radius, Math.min(w, h) / 2f));
-        setU4f(shader, "u_Color",
-            fc.getRed()/255f, fc.getGreen()/255f,
-            fc.getBlue()/255f, fc.getAlpha()/255f);
-        setU4f(shader, "u_OutlineColor",
-            oc.getRed()/255f, oc.getGreen()/255f,
-            oc.getBlue()/255f, oc.getAlpha()/255f);
-        setU1f(shader, "u_OutlineWidth",
-            outlineColor != null ? outlineWidth : 0f);
-        setU4f(shader, "u_GlowColor",
-            gc.getRed()/255f, gc.getGreen()/255f,
-            gc.getBlue()/255f, gc.getAlpha()/255f);
-        setU1f(shader, "u_GlowRadius",
-            glowColor != null ? glowRadius : 0f);
-        setU1f(shader, "u_Time", time < 0f ? 0f : time);
-
-        BufferBuilder buf = Tessellator.getInstance().begin(
-            VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
-        buf.vertex(mat, x,     y,     0).texture(0f, 0f);
-        buf.vertex(mat, x,     y + h, 0).texture(0f, 1f);
-        buf.vertex(mat, x + w, y + h, 0).texture(1f, 1f);
-        buf.vertex(mat, x + w, y,     0).texture(1f, 0f);
-        BufferRenderer.drawWithGlobalProgram(buf.end());
-
-        RenderSystem.disableBlend();
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // UNIFORM HELPERS
-    // ═══════════════════════════════════════════════════════
-
-    private static void setU1f(ShaderProgram s, String name, float a) {
-        GlUniform u = s.getUniform(name);
-        if (u != null) u.set(a);
-    }
-
-    private static void setU2f(ShaderProgram s, String name,
-                                float a, float b) {
-        GlUniform u = s.getUniform(name);
-        if (u != null) u.set(a, b);
-    }
-
-    private static void setU4f(ShaderProgram s, String name,
-                                float a, float b, float c, float d) {
-        GlUniform u = s.getUniform(name);
-        if (u != null) u.set(a, b, c, d);
-    }
-                         }
+}
