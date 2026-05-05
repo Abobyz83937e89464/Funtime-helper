@@ -5,9 +5,7 @@ import net.minecraft.client.MinecraftClient;
 public class ScaleUtil {
 
     public static float getScale() {
-        return (float) MinecraftClient.getInstance()
-                                      .getWindow()
-                                      .getScaleFactor();
+        return (float) MinecraftClient.getInstance().getWindow().getScaleFactor();
     }
 
     public static int getScaledWidth() {
