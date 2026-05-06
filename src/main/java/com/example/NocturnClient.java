@@ -2,7 +2,11 @@ package com.example;
 
 import com.example.util.render.DrawHelper;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
+import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
+import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
+import net.minecraft.resource.ResourceManager;
+import net.minecraft.resource.ResourceType;
+import net.minecraft.util.Identifier;
 
 public class NocturnClient implements ClientModInitializer {
 
@@ -10,9 +14,18 @@ public class NocturnClient implements ClientModInitializer {
     public void onInitializeClient() {
         System.out.println("[Nocturn Client] Loaded!");
 
-        // ✅ Правильная регистрация шейдера в 1.21.4
-        CoreShaderRegistrationCallback.EVENT.register(context -> {
-            context.register(DrawHelper.ROUNDED_RECT);
-        });
+        ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES)
+            .registerReloadListener(new SimpleSynchronousResourceReloadListener() {
+
+                @Override
+                public Identifier getFabricId() {
+                    return Identifier.of("nocturn-client", "drawhelper");
+                }
+
+                @Override
+                public void reload(ResourceManager manager) {
+                    DrawHelper.init(manager);
+                }
+            });
     }
 }
