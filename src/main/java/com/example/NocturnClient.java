@@ -24,6 +24,7 @@ public class NocturnClient implements ClientModInitializer {
 
                 @Override
                 public void reload(ResourceManager manager) {
+                    // ✅ ResourceManager, не ResourceFactory
                     DrawHelper.init(manager);
                 }
             });
