@@ -1,12 +1,13 @@
 package com.example.util.render;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.gl.ShaderProgramKey;
 import net.minecraft.client.gl.ShaderProgramKeys;
-import net.minecraft.client.render.*;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.resource.ResourceFactory;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
 
@@ -15,38 +16,49 @@ import java.awt.Color;
 public class DrawHelper {
 
     // ══════════════════════════════════════════════════════════════
-    // SHADER KEY — регистрируется через CoreShaderRegistrationCallback
+    // SHADER — загружается через ResourceManagerHelper
     // ══════════════════════════════════════════════════════════════
 
-    public static final ShaderProgramKey ROUNDED_RECT = new ShaderProgramKey(
-        Identifier.of("nocturn-client", "rounded_rect"),
-        VertexFormats.POSITION_TEXTURE
-    );
+    private static ShaderProgram shader;
+
+    public static void init(ResourceFactory rm) {
+        try {
+            if (shader != null) {
+                shader.close();
+                shader = null;
+            }
+            shader = new ShaderProgram(
+                rm,
+                Identifier.of("nocturn-client", "rounded_rect"),
+                VertexFormats.POSITION_TEXTURE
+            );
+            System.out.println("[DrawHelper] Shader loaded OK");
+        } catch (Exception e) {
+            System.err.println("[DrawHelper] Shader load FAILED: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private static boolean ok() { return shader != null; }
 
     // ══════════════════════════════════════════════════════════════
     // ОСНОВНЫЕ МЕТОДЫ
     // ══════════════════════════════════════════════════════════════
 
-    /** Скруглённый прямоугольник */
     public static void drawRect(Matrix4f m, float x, float y, float w, float h,
                                 float radius, Color color) {
         sdf(m, x, y, w, h, radius, color, null, 0, null, 0, -1);
     }
 
-    /** Без радиуса */
     public static void drawRect(Matrix4f m, float x, float y, float w, float h, Color color) {
         sdf(m, x, y, w, h, 0, color, null, 0, null, 0, -1);
     }
 
-    /** Через DrawContext */
     public static void drawRect(DrawContext ctx, float x, float y, float w, float h, Color color) {
         sdf(ctx.getMatrices().peek().getPositionMatrix(),
             x, y, w, h, 0, color, null, 0, null, 0, -1);
     }
 
-    /**
-     * Разные радиусы углов: tl, tr, br, bl
-     */
     public static void drawStyledRect(Matrix4f m, float x, float y, float w, float h,
                                       float tl, float tr, float br, float bl, Color color) {
         if (tl == tr && tr == br && br == bl) {
@@ -66,7 +78,6 @@ public class DrawHelper {
         if (br == 0 && botR > 0) drawRectRaw(m, x + w - botR, y + h - botR, botR, botR, color);
     }
 
-    /** Outline (обводка) */
     public static void drawOutline(MatrixStack ms, float x, float y, float w, float h,
                                    float radius, Color color, float thickness) {
         sdf(ms.peek().getPositionMatrix(),
@@ -78,7 +89,6 @@ public class DrawHelper {
             null, 0, -1);
     }
 
-    /** Мягкое свечение */
     public static void drawGlow(Matrix4f m, float x, float y, float w, float h,
                                 float radius, float spread, Color color) {
         sdf(m,
@@ -90,14 +100,12 @@ public class DrawHelper {
             color, spread, -1);
     }
 
-    /** Shimmer / радуга по hue */
     public static void drawShimmer(Matrix4f m, float x, float y, float w, float h,
                                    float radius, Color baseColor) {
         float time = (System.currentTimeMillis() % 100_000L) / 1000f;
         sdf(m, x, y, w, h, radius, baseColor, null, 0, null, 0, time);
     }
 
-    /** Круг через SDF */
     public static void drawCircle(Matrix4f m, float cx, float cy, int segments, float r, Color color) {
         sdf(m, cx - r, cy - r, r * 2, r * 2, r, color, null, 0, null, 0, -1);
     }
@@ -162,7 +170,7 @@ public class DrawHelper {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // RAW RECT (без шейдера, для 1px разделителей)
+    // RAW RECT
     // ══════════════════════════════════════════════════════════════
 
     public static void drawRectRaw(Matrix4f m, float x, float y, float w, float h, Color c) {
@@ -183,7 +191,7 @@ public class DrawHelper {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // CORE SDF DRAW — вот главное исправление для 1.21.4
+    // CORE SDF — ключевое исправление: getUniform().set() вместо GL20
     // ══════════════════════════════════════════════════════════════
 
     private static void sdf(Matrix4f mat,
@@ -193,36 +201,32 @@ public class DrawHelper {
                             Color outlineColor, float outlineWidth,
                             Color glowColor,    float glowRadius,
                             float time) {
-        if (w <= 0 || h <= 0) return;
+        if (!ok() || w <= 0 || h <= 0) return;
 
         RenderSystem.enableBlend();
         RenderSystem.blendFuncSeparate(
-            com.mojang.blaze3d.platform.GlStateManager.SrcFactor.SRC_ALPHA,
-            com.mojang.blaze3d.platform.GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA,
-            com.mojang.blaze3d.platform.GlStateManager.SrcFactor.ONE,
-            com.mojang.blaze3d.platform.GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
+            GlStateManager.SrcFactor.SRC_ALPHA,
+            GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA,
+            GlStateManager.SrcFactor.ONE,
+            GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
 
-        // ✅ Правильный способ для 1.21.4
-        RenderSystem.setShader(ROUNDED_RECT);
-        ShaderProgram shader = RenderSystem.getShader();
+        // ✅ Правильный способ для 1.21.4 — лямбда с нашим шейдером
+        RenderSystem.setShader(() -> shader);
 
-        if (shader != null) {
-            // ✅ Используем getUniform().set() — не GL20 напрямую
-            safeSet2f(shader, "u_Resolution", w, h);
-            safeSet4f(shader, "u_Rect",       0, 0, w, h);
-            safeSet1f(shader, "u_Radius",     Math.min(radius, Math.min(w, h) / 2f));
+        // ✅ Uniforms через getUniform().set() — не GL20
+        Color fc = fill         != null ? fill         : new Color(0, 0, 0, 0);
+        Color oc = outlineColor != null ? outlineColor : new Color(0, 0, 0, 0);
+        Color gc = glowColor    != null ? glowColor    : new Color(0, 0, 0, 0);
 
-            Color fc = fill         != null ? fill         : new Color(0,0,0,0);
-            Color oc = outlineColor != null ? outlineColor : new Color(0,0,0,0);
-            Color gc = glowColor    != null ? glowColor    : new Color(0,0,0,0);
-
-            safeSet4f(shader, "u_Color",        fc.getRed()/255f, fc.getGreen()/255f, fc.getBlue()/255f, fc.getAlpha()/255f);
-            safeSet4f(shader, "u_OutlineColor", oc.getRed()/255f, oc.getGreen()/255f, oc.getBlue()/255f, oc.getAlpha()/255f);
-            safeSet1f(shader, "u_OutlineWidth", outlineColor != null ? outlineWidth : 0);
-            safeSet4f(shader, "u_GlowColor",    gc.getRed()/255f, gc.getGreen()/255f, gc.getBlue()/255f, gc.getAlpha()/255f);
-            safeSet1f(shader, "u_GlowRadius",   glowColor != null ? glowRadius : 0);
-            safeSet1f(shader, "u_Time",         time < 0 ? 0f : time);
-        }
+        set2f("u_Resolution", w, h);
+        set4f("u_Rect",       0, 0, w, h);
+        set1f("u_Radius",     Math.min(radius, Math.min(w, h) / 2f));
+        set4f("u_Color",        fc.getRed()/255f, fc.getGreen()/255f, fc.getBlue()/255f, fc.getAlpha()/255f);
+        set4f("u_OutlineColor", oc.getRed()/255f, oc.getGreen()/255f, oc.getBlue()/255f, oc.getAlpha()/255f);
+        set1f("u_OutlineWidth", outlineColor != null ? outlineWidth : 0f);
+        set4f("u_GlowColor",    gc.getRed()/255f, gc.getGreen()/255f, gc.getBlue()/255f, gc.getAlpha()/255f);
+        set1f("u_GlowRadius",   glowColor != null ? glowRadius : 0f);
+        set1f("u_Time",         time < 0 ? 0f : time);
 
         BufferBuilder buf = Tessellator.getInstance().begin(
             VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
@@ -236,20 +240,23 @@ public class DrawHelper {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // SAFE UNIFORM HELPERS
+    // UNIFORM HELPERS — через shader.getUniform(), null-safe
     // ══════════════════════════════════════════════════════════════
 
-    private static void safeSet1f(ShaderProgram shader, String name, float a) {
+    private static void set1f(String name, float a) {
+        if (shader == null) return;
         var u = shader.getUniform(name);
         if (u != null) u.set(a);
     }
 
-    private static void safeSet2f(ShaderProgram shader, String name, float a, float b) {
+    private static void set2f(String name, float a, float b) {
+        if (shader == null) return;
         var u = shader.getUniform(name);
         if (u != null) u.set(a, b);
     }
 
-    private static void safeSet4f(ShaderProgram shader, String name, float a, float b, float c, float d) {
+    private static void set4f(String name, float a, float b, float c, float d) {
+        if (shader == null) return;
         var u = shader.getUniform(name);
         if (u != null) u.set(a, b, c, d);
     }
