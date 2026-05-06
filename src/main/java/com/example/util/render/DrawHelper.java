@@ -6,118 +6,117 @@ import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.resource.ResourceFactory;
+import net.minecraft.resource.ResourceManager;
+import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
 
 import java.awt.Color;
+import java.io.InputStream;
 import java.nio.FloatBuffer;
-import org.lwjgl.BufferUtils;
 
 public class DrawHelper {
 
     // ══════════════════════════════════════════════════════════════
-    // SHADER — чистый OpenGL, без ShaderProgram вообще
+    // OPENGL OBJECTS
     // ══════════════════════════════════════════════════════════════
 
     private static int programId = -1;
+    private static int vaoId     = -1;
+    private static int vboId     = -1;
 
-    private static final String VSH =
-        "#version 150\n" +
-        "in vec3 Position;\n" +
-        "in vec2 UV0;\n" +
-        "uniform mat4 ModelViewMat;\n" +
-        "uniform mat4 ProjMat;\n" +
-        "out vec2 texCoord;\n" +
-        "void main() {\n" +
-        "    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);\n" +
-        "    texCoord = UV0;\n" +
-        "}\n";
+    // 4 вершины × (3 pos + 2 uv) = 20 float
+    private static final FloatBuffer VERT_BUF = BufferUtils.createFloatBuffer(20);
+    private static final FloatBuffer MAT_BUF  = BufferUtils.createFloatBuffer(16);
 
-    private static final String FSH =
-        "#version 150\n" +
-        "in vec2 texCoord;\n" +
-        "out vec4 fragColor;\n" +
-        "uniform vec2  u_Resolution;\n" +
-        "uniform vec4  u_Rect;\n" +
-        "uniform float u_Radius;\n" +
-        "uniform vec4  u_Color;\n" +
-        "uniform vec4  u_OutlineColor;\n" +
-        "uniform float u_OutlineWidth;\n" +
-        "uniform vec4  u_GlowColor;\n" +
-        "uniform float u_GlowRadius;\n" +
-        "uniform float u_Time;\n" +
-        "float roundedBoxSDF(vec2 p, vec2 b, float r) {\n" +
-        "    vec2 q = abs(p) - b + r;\n" +
-        "    return length(max(q,0.0)) + min(max(q.x,q.y),0.0) - r;\n" +
-        "}\n" +
-        "vec3 hsv2rgb(vec3 c) {\n" +
-        "    vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);\n" +
-        "    vec3 p = abs(fract(c.xxx + K.xyz)*6.0 - K.www);\n" +
-        "    return c.z * mix(K.xxx, clamp(p-K.xxx, 0.0, 1.0), c.y);\n" +
-        "}\n" +
-        "void main() {\n" +
-        "    vec2 fragPos  = u_Rect.xy + texCoord * u_Rect.zw;\n" +
-        "    vec2 center   = u_Rect.xy + u_Rect.zw * 0.5;\n" +
-        "    vec2 halfSize = u_Rect.zw * 0.5;\n" +
-        "    vec2 p        = fragPos - center;\n" +
-        "    float dist = roundedBoxSDF(p, halfSize, u_Radius);\n" +
-        "    float aa = 0.8;\n" +
-        "    float glowAlpha = 0.0;\n" +
-        "    if (u_GlowRadius > 0.0 && u_GlowColor.a > 0.0) {\n" +
-        "        float g = clamp(dist / u_GlowRadius, 0.0, 1.0);\n" +
-        "        glowAlpha = (1.0 - g*g) * u_GlowColor.a;\n" +
-        "    }\n" +
-        "    float outlineAlpha = 0.0;\n" +
-        "    if (u_OutlineWidth > 0.0 && u_OutlineColor.a > 0.0) {\n" +
-        "        float outerDist = dist + u_OutlineWidth;\n" +
-        "        outlineAlpha = smoothstep(aa,-aa,outerDist) - smoothstep(aa,-aa,dist);\n" +
-        "        outlineAlpha *= u_OutlineColor.a;\n" +
-        "    }\n" +
-        "    float fillAlpha = smoothstep(aa,-aa,dist) * u_Color.a;\n" +
-        "    vec3 fillRGB = u_Color.rgb;\n" +
-        "    if (u_Time > 0.0 && fillAlpha > 0.0) {\n" +
-        "        float normX = (p.x + halfSize.x) / u_Rect.z;\n" +
-        "        float hue   = fract(normX * 0.45 + u_Time * 0.13);\n" +
-        "        vec3 shimmer = hsv2rgb(vec3(hue, 0.50, 1.0));\n" +
-        "        fillRGB = mix(fillRGB, shimmer, 0.30);\n" +
-        "    }\n" +
-        "    vec3 col = vec3(0.0); float a = 0.0;\n" +
-        "    col = mix(col, u_GlowColor.rgb, glowAlpha);       a = max(a, glowAlpha);\n" +
-        "    col = mix(col, u_OutlineColor.rgb, outlineAlpha); a = max(a, outlineAlpha);\n" +
-        "    col = mix(col, fillRGB, fillAlpha);               a = max(a, fillAlpha);\n" +
-        "    if (a < 0.004) discard;\n" +
-        "    fragColor = vec4(col, a);\n" +
-        "}\n";
+    // ══════════════════════════════════════════════════════════════
+    // INIT — читаем шейдеры из ресурсов
+    // ══════════════════════════════════════════════════════════════
 
-    /** Вызывается из ResourceReloadListener */
-    public static void init(ResourceFactory rm) {
-        if (programId != -1) {
-            GL20.glDeleteProgram(programId);
-            programId = -1;
-        }
+    public static void init(ResourceManager rm) {
+        // Очищаем старые объекты
+        if (programId != -1) { GL20.glDeleteProgram(programId);      programId = -1; }
+        if (vboId     != -1) { GL15.glDeleteBuffers(vboId);          vboId     = -1; }
+        if (vaoId     != -1) { GL30.glDeleteVertexArrays(vaoId);     vaoId     = -1; }
+
         try {
-            int vert = compileShader(GL20.GL_VERTEX_SHADER,   VSH);
-            int frag = compileShader(GL20.GL_FRAGMENT_SHADER, FSH);
+            // ✅ Читаем .vsh и .fsh из assets/nocturn-client/shaders/core/
+            String vsh = readResource(rm, "nocturn-client", "shaders/core/rounded_rect.vsh");
+            String fsh = readResource(rm, "nocturn-client", "shaders/core/rounded_rect.fsh");
+
+            if (vsh == null || fsh == null) {
+                System.err.println("[DrawHelper] Shader files not found in resources!");
+                return;
+            }
+
+            // Компилируем
+            int vert = compileShader(GL20.GL_VERTEX_SHADER,   vsh);
+            int frag = compileShader(GL20.GL_FRAGMENT_SHADER, fsh);
+
             programId = GL20.glCreateProgram();
             GL20.glAttachShader(programId, vert);
             GL20.glAttachShader(programId, frag);
+
+            // Биндим атрибуты ДО линковки
             GL20.glBindAttribLocation(programId, 0, "Position");
             GL20.glBindAttribLocation(programId, 1, "UV0");
+
             GL20.glLinkProgram(programId);
-            if (GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS) == GL20.GL_FALSE) {
-                System.err.println("[DrawHelper] Link FAILED: " + GL20.glGetProgramInfoLog(programId));
-                GL20.glDeleteProgram(programId);
-                programId = -1;
-            } else {
-                System.out.println("[DrawHelper] Shader OK, id=" + programId);
-            }
             GL20.glDeleteShader(vert);
             GL20.glDeleteShader(frag);
+
+            if (GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS) == GL20.GL_FALSE) {
+                System.err.println("[DrawHelper] Link FAILED:\n" + GL20.glGetProgramInfoLog(programId));
+                GL20.glDeleteProgram(programId);
+                programId = -1;
+                return;
+            }
+
+            // ✅ VAO + VBO — правильный core profile рендеринг
+            vaoId = GL30.glGenVertexArrays();
+            vboId = GL15.glGenBuffers();
+
+            GL30.glBindVertexArray(vaoId);
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboId);
+            // Аллоцируем буфер под 4 вершины (20 float × 4 байта)
+            GL15.glBufferData(GL15.GL_ARRAY_BUFFER, 20L * Float.BYTES, GL15.GL_DYNAMIC_DRAW);
+
+            // Position: location=0, 3 float, stride=5×4, offset=0
+            GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 5 * Float.BYTES, 0L);
+            GL20.glEnableVertexAttribArray(0);
+            // UV0: location=1, 2 float, stride=5×4, offset=3×4
+            GL20.glVertexAttribPointer(1, 2, GL11.GL_FLOAT, false, 5 * Float.BYTES, 3L * Float.BYTES);
+            GL20.glEnableVertexAttribArray(1);
+
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+            GL30.glBindVertexArray(0);
+
+            System.out.println("[DrawHelper] Shader OK, programId=" + programId);
+
         } catch (Exception e) {
             System.err.println("[DrawHelper] init FAILED: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private static String readResource(ResourceManager rm, String namespace, String path) {
+        try {
+            Identifier id  = Identifier.of(namespace, path);
+            var         opt = rm.getResource(id);
+            if (opt.isEmpty()) {
+                System.err.println("[DrawHelper] Resource not found: " + id);
+                return null;
+            }
+            try (InputStream is = opt.get().getInputStream()) {
+                return new String(is.readAllBytes());
+            }
+        } catch (Exception e) {
+            System.err.println("[DrawHelper] readResource error for " + path + ": " + e.getMessage());
+            return null;
         }
     }
 
@@ -126,14 +125,14 @@ public class DrawHelper {
         GL20.glShaderSource(id, src);
         GL20.glCompileShader(id);
         if (GL20.glGetShaderi(id, GL20.GL_COMPILE_STATUS) == GL20.GL_FALSE)
-            System.err.println("[DrawHelper] Compile error: " + GL20.glGetShaderInfoLog(id));
+            System.err.println("[DrawHelper] Compile error:\n" + GL20.glGetShaderInfoLog(id));
         return id;
     }
 
-    private static boolean ok() { return programId != -1; }
+    private static boolean ok() { return programId != -1 && vaoId != -1 && vboId != -1; }
 
     // ══════════════════════════════════════════════════════════════
-    // ПУБЛИЧНЫЕ МЕТОДЫ
+    // ПУБЛИЧНЫЕ МЕТОДЫ РИСОВАНИЯ
     // ══════════════════════════════════════════════════════════════
 
     public static void drawRect(Matrix4f m, float x, float y, float w, float h,
@@ -150,12 +149,21 @@ public class DrawHelper {
             x, y, w, h, 0, color, null, 0, null, 0, -1);
     }
 
+    public static void drawRect(DrawContext ctx, float x, float y, float w, float h,
+                                float radius, Color color) {
+        sdf(ctx.getMatrices().peek().getPositionMatrix(),
+            x, y, w, h, radius, color, null, 0, null, 0, -1);
+    }
+
     public static void drawStyledRect(Matrix4f m, float x, float y, float w, float h,
                                       float tl, float tr, float br, float bl, Color color) {
         if (tl == tr && tr == br && br == bl) {
-            drawRect(m, x, y, w, h, tl, color); return;
+            drawRect(m, x, y, w, h, tl, color);
+            return;
         }
-        float topR = Math.max(tl, tr), botR = Math.max(bl, br), half = h / 2f;
+        float topR = Math.max(tl, tr);
+        float botR = Math.max(bl, br);
+        float half = h / 2f;
         sdf(m, x, y,        w, half + 1, topR, color, null, 0, null, 0, -1);
         sdf(m, x, y + half, w, half + 1, botR, color, null, 0, null, 0, -1);
         if (tl == 0 && topR > 0) drawRectRaw(m, x,            y,            topR, topR, color);
@@ -170,13 +178,13 @@ public class DrawHelper {
             x - thickness, y - thickness,
             w + thickness * 2, h + thickness * 2,
             radius + thickness,
-            new Color(0,0,0,0), color, thickness, null, 0, -1);
+            new Color(0, 0, 0, 0), color, thickness, null, 0, -1);
     }
 
     public static void drawGlow(Matrix4f m, float x, float y, float w, float h,
                                 float radius, float spread, Color color) {
         sdf(m, x - spread, y - spread, w + spread * 2f, h + spread * 2f,
-            radius + spread, new Color(0,0,0,0), null, 0, color, spread, -1);
+            radius + spread, new Color(0, 0, 0, 0), null, 0, color, spread, -1);
     }
 
     public static void drawShimmer(Matrix4f m, float x, float y, float w, float h,
@@ -204,7 +212,7 @@ public class DrawHelper {
 
     public static void drawGradientV(DrawContext ctx, float x, float y,
                                      float w, float h, Color top, Color bottom) {
-        ctx.fillGradient((int)x, (int)y, (int)(x+w), (int)(y+h),
+        ctx.fillGradient((int)x, (int)y, (int)(x + w), (int)(y + h),
                          top.getRGB(), bottom.getRGB());
     }
 
@@ -244,7 +252,7 @@ public class DrawHelper {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // RAW RECT
+    // RAW RECT (без шейдера, для 1px линий)
     // ══════════════════════════════════════════════════════════════
 
     public static void drawRectRaw(Matrix4f m, float x, float y, float w, float h, Color c) {
@@ -265,7 +273,7 @@ public class DrawHelper {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // CORE SDF — чистый OpenGL, без ShaderProgram вообще
+    // CORE SDF — VAO/VBO рендеринг (core profile совместимый)
     // ══════════════════════════════════════════════════════════════
 
     private static void sdf(Matrix4f mat,
@@ -277,11 +285,11 @@ public class DrawHelper {
                             float time) {
         if (!ok() || w <= 0 || h <= 0) return;
 
-        Color fc = fill         != null ? fill         : new Color(0,0,0,0);
-        Color oc = outlineColor != null ? outlineColor : new Color(0,0,0,0);
-        Color gc = glowColor    != null ? glowColor    : new Color(0,0,0,0);
+        Color fc = fill         != null ? fill         : new Color(0, 0, 0, 0);
+        Color oc = outlineColor != null ? outlineColor : new Color(0, 0, 0, 0);
+        Color gc = glowColor    != null ? glowColor    : new Color(0, 0, 0, 0);
 
-        // ✅ Включаем blend через GlStateManager (чтобы не конфликтовать с MC)
+        // Blend
         GlStateManager._enableBlend();
         GlStateManager._blendFuncSeparate(
             GlStateManager.SrcFactor.SRC_ALPHA.value,
@@ -289,40 +297,52 @@ public class DrawHelper {
             GlStateManager.SrcFactor.ONE.value,
             GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA.value);
 
-        // ✅ Активируем наш шейдер напрямую через GL
+        // Активируем шейдер
         GL20.glUseProgram(programId);
 
-        // ModelViewMat + ProjMat
+        // Матрицы
         setMat4("ModelViewMat", RenderSystem.getModelViewMatrix());
         setMat4("ProjMat",      RenderSystem.getProjectionMatrix());
 
-        // Наши uniforms
+        // Uniforms
         u2f("u_Resolution", w, h);
         u4f("u_Rect",       0, 0, w, h);
         u1f("u_Radius",     Math.min(radius, Math.min(w, h) / 2f));
-        u4f("u_Color",        fc.getRed()/255f, fc.getGreen()/255f, fc.getBlue()/255f, fc.getAlpha()/255f);
-        u4f("u_OutlineColor", oc.getRed()/255f, oc.getGreen()/255f, oc.getBlue()/255f, oc.getAlpha()/255f);
+        u4f("u_Color",
+            fc.getRed()/255f, fc.getGreen()/255f, fc.getBlue()/255f, fc.getAlpha()/255f);
+        u4f("u_OutlineColor",
+            oc.getRed()/255f, oc.getGreen()/255f, oc.getBlue()/255f, oc.getAlpha()/255f);
         u1f("u_OutlineWidth", outlineColor != null ? outlineWidth : 0f);
-        u4f("u_GlowColor",    gc.getRed()/255f, gc.getGreen()/255f, gc.getBlue()/255f, gc.getAlpha()/255f);
-        u1f("u_GlowRadius",   glowColor != null ? glowRadius : 0f);
-        u1f("u_Time",         time < 0 ? 0f : time);
+        u4f("u_GlowColor",
+            gc.getRed()/255f, gc.getGreen()/255f, gc.getBlue()/255f, gc.getAlpha()/255f);
+        u1f("u_GlowRadius", glowColor != null ? glowRadius : 0f);
+        u1f("u_Time",       time < 0 ? 0f : time);
 
-        // Рисуем квад с UV
-        GL11.glBegin(GL11.GL_QUADS);
-        // Position + UV0 через attrib
-        GL20.glVertexAttrib2f(1, 0, 0); GL20.glVertexAttrib3f(0, x,   y,   0);
-        GL20.glVertexAttrib2f(1, 0, 1); GL20.glVertexAttrib3f(0, x,   y+h, 0);
-        GL20.glVertexAttrib2f(1, 1, 1); GL20.glVertexAttrib3f(0, x+w, y+h, 0);
-        GL20.glVertexAttrib2f(1, 1, 0); GL20.glVertexAttrib3f(0, x+w, y,   0);
-        GL11.glEnd();
+        // ✅ Загружаем вершины в VBO
+        // Формат: x, y, z, u, v
+        VERT_BUF.clear();
+        VERT_BUF.put(x  ).put(y  ).put(0).put(0).put(0);
+        VERT_BUF.put(x  ).put(y+h).put(0).put(0).put(1);
+        VERT_BUF.put(x+w).put(y+h).put(0).put(1).put(1);
+        VERT_BUF.put(x+w).put(y  ).put(0).put(1).put(0);
+        VERT_BUF.flip();
 
-        // Восстанавливаем состояние
+        GL30.glBindVertexArray(vaoId);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboId);
+        GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, 0, VERT_BUF);
+
+        // ✅ core profile — glDrawArrays вместо glBegin
+        GL11.glDrawArrays(GL11.GL_TRIANGLE_FAN, 0, 4);
+
+        // Восстанавливаем
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+        GL30.glBindVertexArray(0);
         GL20.glUseProgram(0);
         GlStateManager._disableBlend();
     }
 
     // ══════════════════════════════════════════════════════════════
-    // UNIFORM + MATRIX HELPERS
+    // GL HELPERS
     // ══════════════════════════════════════════════════════════════
 
     private static void u1f(String n, float a) {
@@ -337,9 +357,6 @@ public class DrawHelper {
         int l = GL20.glGetUniformLocation(programId, n);
         if (l >= 0) GL20.glUniform4f(l, a, b, c, d);
     }
-
-    private static final FloatBuffer MAT_BUF = BufferUtils.createFloatBuffer(16);
-
     private static void setMat4(String n, Matrix4f mat) {
         int l = GL20.glGetUniformLocation(programId, n);
         if (l >= 0) {
