@@ -29,90 +29,58 @@ public class ModuleElement {
                        Menu.ModuleEntry mod, double mx, double my) {
         Matrix4f m = ms.peek().getPositionMatrix();
 
-        // Индекс для смещения радуги
+        // Индекс для смещения радуги между карточками
         moduleIndex.computeIfAbsent(mod.name, k -> indexCounter++);
-        int idx = moduleIndex.getOrDefault(mod.name, 0);
+        int   idx       = moduleIndex.getOrDefault(mod.name, 0);
+        float idxOffset = idx * 0.065f;
 
-        // Анимации hover и toggle
+        // Анимации
         boolean hovered = mx >= x && mx <= x + modW && my >= y && my <= y + getHeight();
-        float ha = lerp(hoverAnims.getOrDefault(mod.name,  0f), hovered      ? 1f : 0f, 0.16f);
-        float ta = lerp(toggleAnims.getOrDefault(mod.name, 0f), mod.enabled  ? 1f : 0f, 0.13f);
+        float   ha = lerp(hoverAnims.getOrDefault(mod.name,  0f), hovered     ? 1f : 0f, 0.16f);
+        float   ta = lerp(toggleAnims.getOrDefault(mod.name, 0f), mod.enabled ? 1f : 0f, 0.13f);
         hoverAnims.put(mod.name, ha);
         toggleAnims.put(mod.name, ta);
 
         float panelY = y + Fonts.height() + NAME_GAP;
         float rad    = 6f;
 
-        // Rainbow цвет — каждый модуль свой сдвиг
-        Color rainbow     = DrawHelper.getRainbow(idx * 0.065f, 4f, 0.55f, 1f, 255);
-        Color rainbowDim  = new Color(rainbow.getRed(), rainbow.getGreen(), rainbow.getBlue(), (int)(80  * ta));
-        Color rainbowLine = new Color(rainbow.getRed(), rainbow.getGreen(), rainbow.getBlue(), (int)(220 * ta));
-        Color rainbowGlow = new Color(rainbow.getRed(), rainbow.getGreen(), rainbow.getBlue(), (int)(30  * ta));
+        // Rainbow цвет для текста/outline/toggle
+        Color rainbow = DrawHelper.getRainbow(idxOffset, 4f, 0.55f, 1f, 255);
 
-        // ── Название модуля ───────────────────────────────────────────
+        // ── Название модуля ───────────────────────────────────────
         Color baseNameC = new Color(100, 103, 145);
         Color nameColor = new Color(
-            (int)(baseNameC.getRed()   + (rainbow.getRed()   - baseNameC.getRed())   * ta),
-            (int)(baseNameC.getGreen() + (rainbow.getGreen() - baseNameC.getGreen()) * ta),
-            (int)(baseNameC.getBlue()  + (rainbow.getBlue()  - baseNameC.getBlue())  * ta));
+            clamp((int)(baseNameC.getRed()   + (rainbow.getRed()   - baseNameC.getRed())   * ta)),
+            clamp((int)(baseNameC.getGreen() + (rainbow.getGreen() - baseNameC.getGreen()) * ta)),
+            clamp((int)(baseNameC.getBlue()  + (rainbow.getBlue()  - baseNameC.getBlue())  * ta)));
         DrawHelper.drawTextBold(ctx, mod.name, x, y, nameColor);
 
-        // ── Glow под панелью при включении ───────────────────────────
+        // ── Glow под карточкой при включении ─────────────────────
         if (ta > 0.02f) {
-            DrawHelper.drawGlow(m, x, panelY, modW, PANEL_H, rad, 8, rainbowDim);
+            Color glowC = new Color(
+                rainbow.getRed(), rainbow.getGreen(), rainbow.getBlue(), (int)(55 * ta));
+            DrawHelper.drawGlow(m, x, panelY, modW, PANEL_H, rad, 8, glowC);
         }
 
-        // ── Фон панели ────────────────────────────────────────────────
-        int bgR = (int)(28 + 8  * ta);
-        int bgG = (int)(29 + 7  * ta);
-        int bgB = (int)(38 + 16 * ta);
-        DrawHelper.drawRect(m, x, panelY, modW, PANEL_H, rad, new Color(bgR, bgG, bgB));
+        // ── Фон карточки — module_card шейдер ────────────────────
+        // Весь фон, скругления, переливание, линия-акцент, outline — всё в шейдере
+        DrawHelper.drawModuleCard(m, x, panelY, modW, PANEL_H, rad,
+                                  idxOffset, ta, ha, rainbow);
 
-        // Цветной overlay при включении
-        if (ta > 0.01f) {
-            DrawHelper.drawRect(m, x, panelY, modW, PANEL_H, rad,
-                new Color(rainbow.getRed(), rainbow.getGreen(), rainbow.getBlue(), (int)(18 * ta)));
-        }
-
-        // Hover overlay
-        if (ha > 0.01f) {
-            DrawHelper.drawRect(m, x, panelY, modW, PANEL_H, rad,
-                new Color(255, 255, 255, (int)(10 * ha)));
-        }
-
-        // ── Линия-акцент сверху ───────────────────────────────────────
-        if (ta > 0.01f) {
-            float lineW = (modW - rad * 2) * ta;
-            DrawHelper.drawRect(m, x + rad, panelY, lineW, 2f, 0f, rainbowLine);
-            DrawHelper.drawRect(m, x + rad, panelY, lineW, 5f, 0f, rainbowGlow);
-        }
-
-        // ── Outline панели ────────────────────────────────────────────
-        DrawHelper.drawOutline(ms, x - 1, panelY - 1, modW + 2, PANEL_H + 2, rad,
-            new Color(33, 32, 43), 2);
-
-        // Цветной outline при hover/enable
-        float outAlpha = Math.max(ha * 0.2f, ta * 0.45f);
-        if (outAlpha > 0.01f) {
-            DrawHelper.drawOutline(ms, x, panelY, modW, PANEL_H, rad,
-                new Color(rainbow.getRed(), rainbow.getGreen(), rainbow.getBlue(),
-                    (int)(255 * outAlpha)), 1);
-        }
-
-        // ── Статус текст ──────────────────────────────────────────────
+        // ── Статус текст ──────────────────────────────────────────
         float statusY = panelY + (PANEL_H - Fonts.height()) / 2f;
         Color statusC = mod.enabled
             ? new Color(rainbow.getRed(), rainbow.getGreen(), rainbow.getBlue(),
-                        (int)(160 + 95 * ta))
+                        clamp((int)(160 + 95 * ta)))
             : new Color(80, 83, 120);
         DrawHelper.drawText(ctx, mod.enabled ? "Enabled" : "Disabled", x + 8, statusY, statusC);
 
-        // ── Toggle ────────────────────────────────────────────────────
+        // ── Toggle ────────────────────────────────────────────────
         float tw  = 26f, th = 13f;
         float tx2 = x + modW - tw - 7;
         float ty2 = panelY + (PANEL_H - th) / 2f;
 
-        // Фон тоггла — lerp от тёмного к цветному
+        // Фон тоггла
         Color toggleBg = new Color(
             clamp((int)(21 + (rainbow.getRed()   - 21) * ta * 0.7f)),
             clamp((int)(22 + (rainbow.getGreen() - 22) * ta * 0.7f)),
@@ -123,7 +91,7 @@ public class ModuleElement {
         DrawHelper.drawOutline(ms, tx2, ty2, tw, th, th / 2f,
             new Color(33, 32, 43), 1);
 
-        // Кружок тоггла — плавно едет вправо
+        // Кружок тоггла
         float cs  = th - 4f;
         float kcx = tx2 + 2f + ta * (tw - cs - 4f);
         DrawHelper.drawCircle(m, kcx + cs / 2f, ty2 + th / 2f, 14, cs / 2f,
