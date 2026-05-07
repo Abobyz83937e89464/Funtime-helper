@@ -16,7 +16,7 @@ import java.util.List;
 
 public class Menu extends Screen {
 
-    // ── Размеры (уменьшены) ───────────────────────────────────────
+    // ── Размеры ───────────────────────────────────────────────────
     static final int   CONTENT_W = 370;
     static final int   CONTENT_H = 180;
     static final int   HEADER_H  = 26;
@@ -42,7 +42,7 @@ public class Menu extends Screen {
 
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Убираем стандартный blur
+        // ✅ Убираем стандартный blur/оверлей Minecraft
     }
 
     // ── Категории ─────────────────────────────────────────────────
@@ -108,11 +108,7 @@ public class Menu extends Screen {
         float fy = cy + CONTENT_H;
         int   a  = (int)(255 * openAnim);
 
-        // Тёмный оверлей
-        DrawHelper.drawRect(ctx, 0, 0,
-            MinecraftClient.getInstance().getWindow().getScaledWidth(),
-            MinecraftClient.getInstance().getWindow().getScaledHeight(),
-            new Color(0, 0, 0, (int)(120 * openAnim)));
+        // ✅ НЕТ тёмного оверлея — убрали полностью
 
         // Scale анимация при открытии
         float sc = 0.94f + openAnim * 0.06f;
@@ -134,10 +130,11 @@ public class Menu extends Screen {
             new Color(55, 60, 105, (int)(50 * openAnim)),
             new Color(22, 24, 34, 0));
 
+        // ✅ "Nocturn Client" вместо "Funtime Helper"
         float textY = y + (HEADER_H - Fonts.height()) / 2f;
-        DrawHelper.drawTextBoldShadow(ctx, "Funtime", x + 10, textY,
+        DrawHelper.drawTextBoldShadow(ctx, "Nocturn", x + 10, textY,
             new Color(197, 200, 255, a));
-        DrawHelper.drawTextShadow(ctx, " Helper", x + 10 + Fonts.boldWidth("Funtime"), textY,
+        DrawHelper.drawTextShadow(ctx, " Client", x + 10 + Fonts.boldWidth("Nocturn"), textY,
             new Color(125, 136, 255, a));
 
         String catName = categoryElement.getSelectedCategory().getDisplayName();
