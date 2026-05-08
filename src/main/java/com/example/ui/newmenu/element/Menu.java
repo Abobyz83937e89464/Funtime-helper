@@ -16,7 +16,6 @@ import java.util.List;
 
 public class Menu extends Screen {
 
-    // ── Размеры ───────────────────────────────────────────────────
     static final int   CONTENT_W = 370;
     static final int   CONTENT_H = 180;
     static final int   HEADER_H  = 26;
@@ -42,10 +41,8 @@ public class Menu extends Screen {
 
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // ✅ Убираем стандартный blur/оверлей Minecraft
+        // Убираем стандартный Minecraft blur/overlay
     }
-
-    // ── Категории ─────────────────────────────────────────────────
 
     private void updateCurrentModules() {
         modules.clear();
@@ -87,8 +84,6 @@ public class Menu extends Screen {
         return (MinecraftClient.getInstance().getWindow().getScaledHeight() - TOTAL_H)   / 2f;
     }
 
-    // ── Tick ──────────────────────────────────────────────────────
-
     @Override
     public void tick() {
         super.tick();
@@ -96,8 +91,6 @@ public class Menu extends Screen {
         scrollValue += (scrollTarget - scrollValue) * 0.24f;
         updateMaxScroll();
     }
-
-    // ── Render ────────────────────────────────────────────────────
 
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
@@ -108,9 +101,6 @@ public class Menu extends Screen {
         float fy = cy + CONTENT_H;
         int   a  = (int)(255 * openAnim);
 
-        // ✅ НЕТ тёмного оверлея — убрали полностью
-
-        // Scale анимация при открытии
         float sc = 0.94f + openAnim * 0.06f;
         ms.push();
         ms.translate(x + CONTENT_W / 2f, y + TOTAL_H / 2f, 0);
@@ -119,9 +109,9 @@ public class Menu extends Screen {
 
         Matrix4f m = ms.peek().getPositionMatrix();
 
-        // Внешний glow
+        // ✅ Фикс серого слоя — уменьшен spread и alpha
         DrawHelper.drawGlow(m, x, y, CONTENT_W, TOTAL_H, 10, 4,
-            new Color(80, 90, 200, (int)(35 * openAnim)));
+            new Color(80, 90, 200, (int)(18 * openAnim)));
 
         // ── HEADER ────────────────────────────────────────────────
         DrawHelper.drawStyledRect(m, x, y, CONTENT_W, HEADER_H, 12, 12, 0, 0,
@@ -130,35 +120,34 @@ public class Menu extends Screen {
             new Color(55, 60, 105, (int)(50 * openAnim)),
             new Color(22, 24, 34, 0));
 
-        // ✅ "Nocturn Client" вместо "Funtime Helper"
+        // ✅ Сначала рисуем ВСЮ геометрию, потом текст — чтобы шейдер не сбивал шрифт
         float textY = y + (HEADER_H - Fonts.height()) / 2f;
-        DrawHelper.drawTextBoldShadow(ctx, "Nocturn", x + 10, textY,
-            new Color(197, 200, 255, a));
-        DrawHelper.drawTextShadow(ctx, " Client", x + 10 + Fonts.boldWidth("Nocturn"), textY,
-            new Color(125, 136, 255, a));
 
-        String catName = categoryElement.getSelectedCategory().getDisplayName();
-        DrawHelper.drawText(ctx, catName,
-            x + (CONTENT_W - Fonts.width(catName)) / 2f, textY,
-            new Color(130, 133, 180, a));
-
-        String ver = "v1.0 / 1.21.4";
-        DrawHelper.drawText(ctx, ver,
-            x + CONTENT_W - Fonts.width(ver) - 10, textY,
-            new Color(55, 58, 88, a));
-
-        // ── CONTENT ───────────────────────────────────────────────
+        // Геометрия контента
         DrawHelper.drawRect(m, x, cy, CONTENT_W, CONTENT_H, 0,
             new Color(14, 16, 21, a));
-
         DrawHelper.drawRectRaw(m, x, cy, CONTENT_W, 1,
             new Color(42, 41, 62, a));
 
+        // Геометрия footer
+        DrawHelper.drawRectRaw(m, x, fy, CONTENT_W, 1,
+            new Color(42, 41, 62, a));
+        DrawHelper.drawStyledRect(m, x, fy, CONTENT_W, FOOTER_H, 0, 0, 12, 12,
+            new Color(22, 24, 34, a));
+        DrawHelper.drawGradientH(m, x, fy, CONTENT_W * 0.5f, FOOTER_H,
+            new Color(45, 50, 95, (int)(40 * openAnim)),
+            new Color(22, 24, 34, 0));
+
+        // Outline меню
+        DrawHelper.drawOutline(ms, x - 1, y - 1, CONTENT_W + 2, TOTAL_H + 2,
+            12, new Color(48, 47, 68, a), 1);
+
+        // Модули (карточки)
         ctx.enableScissor((int)x, (int)cy, (int)(x + CONTENT_W), (int)fy);
         renderModules(ctx, ms, (int)(x + PADDING), (int)(cy + PADDING), mouseX, mouseY);
         ctx.disableScissor();
 
-        // Fade сверху/снизу
+        // Fade
         DrawHelper.drawGradientV(ctx, x, cy, CONTENT_W, 10,
             new Color(14, 16, 21, a), new Color(14, 16, 21, 0));
         DrawHelper.drawGradientV(ctx, x, fy - 10, CONTENT_W, 10,
@@ -176,25 +165,29 @@ public class Menu extends Screen {
                 new Color(125, 136, 255, a));
         }
 
-        // ── FOOTER ────────────────────────────────────────────────
-        DrawHelper.drawRectRaw(m, x, fy, CONTENT_W, 1,
-            new Color(42, 41, 62, a));
-        DrawHelper.drawStyledRect(m, x, fy, CONTENT_W, FOOTER_H, 0, 0, 12, 12,
-            new Color(22, 24, 34, a));
-        DrawHelper.drawGradientH(m, x, fy, CONTENT_W * 0.5f, FOOTER_H,
-            new Color(45, 50, 95, (int)(40 * openAnim)),
-            new Color(22, 24, 34, 0));
+        // ✅ Весь текст — В КОНЦЕ, после всей геометрии
+        // Header текст
+        DrawHelper.drawTextBoldShadow(ctx, "Nocturn", x + 10, textY,
+            new Color(197, 200, 255, a));
+        DrawHelper.drawTextShadow(ctx, " Client",
+            x + 10 + Fonts.boldWidth("Nocturn"), textY,
+            new Color(125, 136, 255, a));
 
+        String catName = categoryElement.getSelectedCategory().getDisplayName();
+        DrawHelper.drawText(ctx, catName,
+            x + (CONTENT_W - Fonts.width(catName)) / 2f, textY,
+            new Color(130, 133, 180, a));
+
+        String ver = "v1.0 / 1.21.4";
+        DrawHelper.drawText(ctx, ver,
+            x + CONTENT_W - Fonts.width(ver) - 10, textY,
+            new Color(55, 58, 88, a));
+
+        // Footer
         categoryElement.renderFooter(ctx, x, fy, CONTENT_W, FOOTER_H, openAnim);
-
-        // Outline всего меню
-        DrawHelper.drawOutline(ms, x - 1, y - 1, CONTENT_W + 2, TOTAL_H + 2,
-            12, new Color(48, 47, 68, a), 1);
 
         ms.pop();
     }
-
-    // ── Модули ────────────────────────────────────────────────────
 
     private void renderModules(DrawContext ctx, MatrixStack ms,
                                int startX, int startY, int mx, int my) {
@@ -220,8 +213,6 @@ public class Menu extends Screen {
             colY[col] += (int)(modH + PADDING);
         }
     }
-
-    // ── Input ─────────────────────────────────────────────────────
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
@@ -272,8 +263,6 @@ public class Menu extends Screen {
     }
 
     @Override public boolean shouldPause() { return false; }
-
-    // ── ModuleEntry ───────────────────────────────────────────────
 
     public static class ModuleEntry {
         public String  name;
