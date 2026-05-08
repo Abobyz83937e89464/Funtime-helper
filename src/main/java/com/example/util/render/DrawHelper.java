@@ -57,10 +57,8 @@ public class DrawHelper {
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboId);
             GL15.glBufferData(GL15.GL_ARRAY_BUFFER, 20L * Float.BYTES, GL15.GL_DYNAMIC_DRAW);
 
-            // Position: location 0, 3 floats
             GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 5 * Float.BYTES, 0L);
             GL20.glEnableVertexAttribArray(0);
-            // UV0: location 1, 2 floats
             GL20.glVertexAttribPointer(1, 2, GL11.GL_FLOAT, false, 5 * Float.BYTES, 3L * Float.BYTES);
             GL20.glEnableVertexAttribArray(1);
 
@@ -114,16 +112,13 @@ public class DrawHelper {
     private static boolean cardOk() { return progCard != -1 && vaoOk(); }
 
     // ══════════════════════════════════════════════════════════════
-    // RESTORE — ключевой фикс текста
-    // После нашего GL шейдера сбрасываем VAO/VBO/program через
-    // GlStateManager (обновляет внутренний кэш MC).
-    // НЕ вызываем RenderSystem.setShader — это сбивает шейдер текста!
+    // RESTORE STATE после нашего шейдера
     // ══════════════════════════════════════════════════════════════
 
     private static void restore() {
         GL30.glBindVertexArray(0);
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-        GlStateManager._glUseProgram(0);   // обновляет кэш MC → он сам сделает glUseProgram при следующем drawText
+        GlStateManager._glUseProgram(0);
         GlStateManager._disableBlend();
     }
 
@@ -131,17 +126,24 @@ public class DrawHelper {
     // ПУБЛИЧНЫЕ МЕТОДЫ — RECT
     // ══════════════════════════════════════════════════════════════
 
-    public static void drawRect(Matrix4f m, float x, float y, float w, float h, float radius, Color c) {
+    public static void drawRect(Matrix4f m, float x, float y, float w, float h,
+                                float radius, Color c) {
         sdf(m, x, y, w, h, radius, c, null, 0, null, 0, -1);
     }
+
     public static void drawRect(Matrix4f m, float x, float y, float w, float h, Color c) {
         sdf(m, x, y, w, h, 0, c, null, 0, null, 0, -1);
     }
+
     public static void drawRect(DrawContext ctx, float x, float y, float w, float h, Color c) {
-        sdf(ctx.getMatrices().peek().getPositionMatrix(), x, y, w, h, 0, c, null, 0, null, 0, -1);
+        sdf(ctx.getMatrices().peek().getPositionMatrix(),
+            x, y, w, h, 0, c, null, 0, null, 0, -1);
     }
-    public static void drawRect(DrawContext ctx, float x, float y, float w, float h, float radius, Color c) {
-        sdf(ctx.getMatrices().peek().getPositionMatrix(), x, y, w, h, radius, c, null, 0, null, 0, -1);
+
+    public static void drawRect(DrawContext ctx, float x, float y, float w, float h,
+                                float radius, Color c) {
+        sdf(ctx.getMatrices().peek().getPositionMatrix(),
+            x, y, w, h, radius, c, null, 0, null, 0, -1);
     }
 
     public static void drawStyledRect(Matrix4f m, float x, float y, float w, float h,
@@ -159,8 +161,20 @@ public class DrawHelper {
     public static void drawOutline(MatrixStack ms, float x, float y, float w, float h,
                                    float radius, Color c, float thickness) {
         sdf(ms.peek().getPositionMatrix(),
-            x - thickness, y - thickness, w + thickness * 2, h + thickness * 2,
-            radius + thickness, new Color(0,0,0,0), c, thickness, null, 0, -1);
+            x - thickness, y - thickness,
+            w + thickness * 2, h + thickness * 2,
+            radius + thickness,
+            new Color(0, 0, 0, 0), c, thickness, null, 0, -1);
+    }
+
+    // ✅ ВОЗВРАЩЁН — используется в CategoryElement и других местах
+    public static void drawGlow(Matrix4f m, float x, float y, float w, float h,
+                                float radius, float spread, Color color) {
+        sdf(m,
+            x - spread, y - spread,
+            w + spread * 2f, h + spread * 2f,
+            radius + spread,
+            new Color(0, 0, 0, 0), null, 0, color, spread, -1);
     }
 
     public static void drawCircle(Matrix4f m, float cx, float cy, int seg, float r, Color c) {
@@ -171,9 +185,13 @@ public class DrawHelper {
     // MODULE CARD SHADER
     // ══════════════════════════════════════════════════════════════
 
-    public static void drawModuleCard(Matrix4f mat, float x, float y, float w, float h,
-                                      float radius, float idxOffset, float toggle,
-                                      float hover, Color rainbowRGB) {
+    public static void drawModuleCard(Matrix4f mat,
+                                      float x, float y, float w, float h,
+                                      float radius,
+                                      float idxOffset,
+                                      float toggle,
+                                      float hover,
+                                      Color rainbowRGB) {
         if (!cardOk() || w <= 0 || h <= 0) return;
 
         float time = (System.currentTimeMillis() % 100_000L) / 1000f;
@@ -196,9 +214,9 @@ public class DrawHelper {
         u1f(progCard, "u_Hover",      hover);
         u1f(progCard, "u_IdxOffset",  idxOffset);
         u3f(progCard, "u_RainbowRGB",
-            rainbowRGB.getRed()/255f,
-            rainbowRGB.getGreen()/255f,
-            rainbowRGB.getBlue()/255f);
+            rainbowRGB.getRed()   / 255f,
+            rainbowRGB.getGreen() / 255f,
+            rainbowRGB.getBlue()  / 255f);
 
         uploadAndDraw(x, y, w, h);
         restore();
@@ -210,7 +228,8 @@ public class DrawHelper {
 
     public static void drawGradientV(DrawContext ctx, float x, float y,
                                      float w, float h, Color top, Color bottom) {
-        ctx.fillGradient((int)x, (int)y, (int)(x+w), (int)(y+h), top.getRGB(), bottom.getRGB());
+        ctx.fillGradient((int)x, (int)y, (int)(x + w), (int)(y + h),
+                         top.getRGB(), bottom.getRGB());
     }
 
     public static void drawGradientH(Matrix4f m, float x, float y, float w, float h,
@@ -218,7 +237,8 @@ public class DrawHelper {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+        BufferBuilder buf = Tessellator.getInstance().begin(
+            VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
         buf.vertex(m, x,   y+h, 0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
         buf.vertex(m, x+w, y+h, 0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
         buf.vertex(m, x+w, y,   0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
@@ -256,8 +276,10 @@ public class DrawHelper {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        float r = c.getRed()/255f, g = c.getGreen()/255f, b = c.getBlue()/255f, a = c.getAlpha()/255f;
-        BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+        float r = c.getRed()/255f, g = c.getGreen()/255f,
+              b = c.getBlue()/255f, a = c.getAlpha()/255f;
+        BufferBuilder buf = Tessellator.getInstance().begin(
+            VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
         buf.vertex(m, x,   y+h, 0).color(r, g, b, a);
         buf.vertex(m, x+w, y+h, 0).color(r, g, b, a);
         buf.vertex(m, x+w, y,   0).color(r, g, b, a);
@@ -270,25 +292,30 @@ public class DrawHelper {
     // RAINBOW HELPER
     // ══════════════════════════════════════════════════════════════
 
-    public static Color getRainbow(float offset, float speed, float sat, float brightness, int alpha) {
-        float hue = ((System.currentTimeMillis() % (long)(speed * 1000)) / (speed * 1000f) + offset) % 1f;
+    public static Color getRainbow(float offset, float speed, float sat,
+                                   float brightness, int alpha) {
+        float hue = ((System.currentTimeMillis() % (long)(speed * 1000))
+                     / (speed * 1000f) + offset) % 1f;
         Color c = Color.getHSBColor(hue, sat, brightness);
         return new Color(c.getRed(), c.getGreen(), c.getBlue(), alpha);
     }
 
     // ══════════════════════════════════════════════════════════════
-    // SDF CORE
+    // SDF CORE (rounded_rect shader)
     // ══════════════════════════════════════════════════════════════
 
-    private static void sdf(Matrix4f mat, float x, float y, float w, float h,
-                            float radius, Color fill,
+    private static void sdf(Matrix4f mat,
+                            float x, float y, float w, float h,
+                            float radius,
+                            Color fill,
                             Color outlineColor, float outlineWidth,
-                            Color glowColor, float glowRadius, float time) {
+                            Color glowColor,    float glowRadius,
+                            float time) {
         if (!rectOk() || w <= 0 || h <= 0) return;
 
-        Color fc = fill         != null ? fill         : new Color(0,0,0,0);
-        Color oc = outlineColor != null ? outlineColor : new Color(0,0,0,0);
-        Color gc = glowColor    != null ? glowColor    : new Color(0,0,0,0);
+        Color fc = fill         != null ? fill         : new Color(0, 0, 0, 0);
+        Color oc = outlineColor != null ? outlineColor : new Color(0, 0, 0, 0);
+        Color gc = glowColor    != null ? glowColor    : new Color(0, 0, 0, 0);
 
         GlStateManager._enableBlend();
         GlStateManager._blendFuncSeparate(
@@ -301,15 +328,19 @@ public class DrawHelper {
 
         setMat4(progRect, "ModelViewMat", RenderSystem.getModelViewMatrix());
         setMat4(progRect, "ProjMat",      RenderSystem.getProjectionMatrix());
+
         u2f(progRect, "u_Resolution", w, h);
         u4f(progRect, "u_Rect",       0, 0, w, h);
         u1f(progRect, "u_Radius",     Math.min(radius, Math.min(w, h) / 2f));
-        u4f(progRect, "u_Color",       fc.getRed()/255f, fc.getGreen()/255f, fc.getBlue()/255f, fc.getAlpha()/255f);
-        u4f(progRect, "u_OutlineColor",oc.getRed()/255f, oc.getGreen()/255f, oc.getBlue()/255f, oc.getAlpha()/255f);
+        u4f(progRect, "u_Color",
+            fc.getRed()/255f, fc.getGreen()/255f, fc.getBlue()/255f, fc.getAlpha()/255f);
+        u4f(progRect, "u_OutlineColor",
+            oc.getRed()/255f, oc.getGreen()/255f, oc.getBlue()/255f, oc.getAlpha()/255f);
         u1f(progRect, "u_OutlineWidth", outlineColor != null ? outlineWidth : 0f);
-        u4f(progRect, "u_GlowColor",   gc.getRed()/255f, gc.getGreen()/255f, gc.getBlue()/255f, gc.getAlpha()/255f);
-        u1f(progRect, "u_GlowRadius",  glowColor != null ? glowRadius : 0f);
-        u1f(progRect, "u_Time",        time < 0 ? 0f : time);
+        u4f(progRect, "u_GlowColor",
+            gc.getRed()/255f, gc.getGreen()/255f, gc.getBlue()/255f, gc.getAlpha()/255f);
+        u1f(progRect, "u_GlowRadius",   glowColor != null ? glowRadius : 0f);
+        u1f(progRect, "u_Time",         time < 0 ? 0f : time);
 
         uploadAndDraw(x, y, w, h);
         restore();
@@ -338,19 +369,27 @@ public class DrawHelper {
     // ══════════════════════════════════════════════════════════════
 
     private static void u1f(int p, String n, float a) {
-        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform1f(l, a);
+        int l = GL20.glGetUniformLocation(p, n);
+        if (l >= 0) GL20.glUniform1f(l, a);
     }
     private static void u2f(int p, String n, float a, float b) {
-        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform2f(l, a, b);
+        int l = GL20.glGetUniformLocation(p, n);
+        if (l >= 0) GL20.glUniform2f(l, a, b);
     }
     private static void u3f(int p, String n, float a, float b, float c) {
-        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform3f(l, a, b, c);
+        int l = GL20.glGetUniformLocation(p, n);
+        if (l >= 0) GL20.glUniform3f(l, a, b, c);
     }
     private static void u4f(int p, String n, float a, float b, float c, float d) {
-        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform4f(l, a, b, c, d);
+        int l = GL20.glGetUniformLocation(p, n);
+        if (l >= 0) GL20.glUniform4f(l, a, b, c, d);
     }
     private static void setMat4(int p, String n, Matrix4f mat) {
         int l = GL20.glGetUniformLocation(p, n);
-        if (l >= 0) { MAT_BUF.clear(); mat.get(MAT_BUF); GL20.glUniformMatrix4fv(l, false, MAT_BUF); }
+        if (l >= 0) {
+            MAT_BUF.clear();
+            mat.get(MAT_BUF);
+            GL20.glUniformMatrix4fv(l, false, MAT_BUF);
+        }
     }
 }
