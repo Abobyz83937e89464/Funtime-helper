@@ -120,7 +120,7 @@ public class Menu extends Screen {
         Matrix4f m = ms.peek().getPositionMatrix();
 
         // Внешний glow
-        DrawHelper.drawGlow(m, x, y, CONTENT_W, TOTAL_H, 14, 12,
+        DrawHelper.drawGlow(m, x, y, CONTENT_W, TOTAL_H, 10, 4,
             new Color(80, 90, 200, (int)(35 * openAnim)));
 
         // ── HEADER ────────────────────────────────────────────────
