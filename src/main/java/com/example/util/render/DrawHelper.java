@@ -21,16 +21,10 @@ import java.nio.FloatBuffer;
 
 public class DrawHelper {
 
-    // ══════════════════════════════════════════════════════════════
-    // SHADER 1: rounded_rect  (фон меню, outline, glow)
-    // SHADER 2: module_card   (карточки с переливанием)
-    // ══════════════════════════════════════════════════════════════
-
-    private static int progRect = -1;  // rounded_rect
-    private static int progCard = -1;  // module_card
-
-    private static int vaoId = -1;
-    private static int vboId = -1;
+    private static int progRect = -1;
+    private static int progCard = -1;
+    private static int vaoId    = -1;
+    private static int vboId    = -1;
 
     private static final FloatBuffer VERT_BUF = BufferUtils.createFloatBuffer(20);
     private static final FloatBuffer MAT_BUF  = BufferUtils.createFloatBuffer(16);
@@ -40,46 +34,36 @@ public class DrawHelper {
     // ══════════════════════════════════════════════════════════════
 
     public static void init(ResourceManager rm) {
-        // Удаляем старые программы
-        if (progRect != -1) { GL20.glDeleteProgram(progRect); progRect = -1; }
-        if (progCard != -1) { GL20.glDeleteProgram(progCard); progCard = -1; }
-        if (vboId    != -1) { GL15.glDeleteBuffers(vboId);    vboId    = -1; }
-        if (vaoId    != -1) { GL30.glDeleteVertexArrays(vaoId); vaoId  = -1; }
+        if (progRect != -1) { GL20.glDeleteProgram(progRect);   progRect = -1; }
+        if (progCard != -1) { GL20.glDeleteProgram(progCard);   progCard = -1; }
+        if (vboId    != -1) { GL15.glDeleteBuffers(vboId);      vboId    = -1; }
+        if (vaoId    != -1) { GL30.glDeleteVertexArrays(vaoId); vaoId    = -1; }
 
         try {
-            // Шейдер 1
             String vsh1 = readResource(rm, "nocturn-client", "shaders/core/rounded_rect.vsh");
             String fsh1 = readResource(rm, "nocturn-client", "shaders/core/rounded_rect.fsh");
             if (vsh1 != null && fsh1 != null) {
                 progRect = buildProgram(vsh1, fsh1);
-                System.out.println("[DrawHelper] rounded_rect OK, id=" + progRect);
-            } else {
-                System.err.println("[DrawHelper] rounded_rect shaders not found!");
+                System.out.println("[DrawHelper] rounded_rect OK id=" + progRect);
             }
 
-            // Шейдер 2
             String vsh2 = readResource(rm, "nocturn-client", "shaders/core/module_card.vsh");
             String fsh2 = readResource(rm, "nocturn-client", "shaders/core/module_card.fsh");
             if (vsh2 != null && fsh2 != null) {
                 progCard = buildProgram(vsh2, fsh2);
-                System.out.println("[DrawHelper] module_card OK, id=" + progCard);
-            } else {
-                System.err.println("[DrawHelper] module_card shaders not found!");
+                System.out.println("[DrawHelper] module_card OK id=" + progCard);
             }
 
-            // Один VAO/VBO для обоих шейдеров (одинаковый формат вершин)
             vaoId = GL30.glGenVertexArrays();
             vboId = GL15.glGenBuffers();
 
             GL30.glBindVertexArray(vaoId);
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboId);
             GL15.glBufferData(GL15.GL_ARRAY_BUFFER, 20L * Float.BYTES, GL15.GL_DYNAMIC_DRAW);
-
             GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 5 * Float.BYTES, 0L);
             GL20.glEnableVertexAttribArray(0);
             GL20.glVertexAttribPointer(1, 2, GL11.GL_FLOAT, false, 5 * Float.BYTES, 3L * Float.BYTES);
             GL20.glEnableVertexAttribArray(1);
-
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
             GL30.glBindVertexArray(0);
 
@@ -115,7 +99,7 @@ public class DrawHelper {
             if (opt.isEmpty()) { System.err.println("[DrawHelper] Not found: " + id); return null; }
             try (InputStream is = opt.get().getInputStream()) { return new String(is.readAllBytes()); }
         } catch (Exception e) {
-            System.err.println("[DrawHelper] readResource error: " + e.getMessage());
+            System.err.println("[DrawHelper] readResource: " + e.getMessage());
             return null;
         }
     }
@@ -134,7 +118,24 @@ public class DrawHelper {
     private static boolean cardOk() { return progCard != -1 && vaoOk(); }
 
     // ══════════════════════════════════════════════════════════════
-    // ПУБЛИЧНЫЕ МЕТОДЫ — ROUNDED RECT
+    // ВОССТАНОВЛЕНИЕ СОСТОЯНИЯ MC ПОСЛЕ НАШЕГО ШЕЙДЕРА
+    // ── КЛЮЧЕВОЙ ФИКс ТЕКСТА ──────────────────────────────────────
+    // После GL20.glUseProgram() MC не знает что его шейдер сброшен.
+    // setShader() инвалидирует кэш и заставляет MC сделать glUseProgram
+    // при следующем drawText/drawRect.
+    // ══════════════════════════════════════════════════════════════
+
+    private static void restoreMcState() {
+        GL30.glBindVertexArray(0);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+        GlStateManager._glUseProgram(0);
+        // ✅ Инвалидируем кэш шейдера MC — без этого текст не рендерится
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+        GlStateManager._disableBlend();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // RECT METHODS
     // ══════════════════════════════════════════════════════════════
 
     public static void drawRect(Matrix4f m, float x, float y, float w, float h,
@@ -192,17 +193,9 @@ public class DrawHelper {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // ПУБЛИЧНЫЕ МЕТОДЫ — MODULE CARD SHADER
+    // MODULE CARD SHADER
     // ══════════════════════════════════════════════════════════════
 
-    /**
-     * Рисует карточку модуля с радужным переливанием через module_card шейдер.
-     *
-     * @param idxOffset  смещение оттенка для каждого модуля (0.0 .. 1.0)
-     * @param toggle     анимация включения (0.0 .. 1.0)
-     * @param hover      анимация наведения (0.0 .. 1.0)
-     * @param rainbowRGB текущий rainbow цвет для этого модуля
-     */
     public static void drawModuleCard(Matrix4f mat,
                                       float x, float y, float w, float h,
                                       float radius,
@@ -225,7 +218,6 @@ public class DrawHelper {
 
         setMat4p(progCard, "ModelViewMat", RenderSystem.getModelViewMatrix());
         setMat4p(progCard, "ProjMat",      RenderSystem.getProjectionMatrix());
-
         u4fp(progCard, "u_Rect",       0, 0, w, h);
         u1fp(progCard, "u_Radius",     Math.min(radius, Math.min(w, h) / 2f));
         u1fp(progCard, "u_Time",       time);
@@ -237,10 +229,10 @@ public class DrawHelper {
              rainbowRGB.getGreen()/255f,
              rainbowRGB.getBlue()/255f);
 
-        uploadQuad(x, y, w, h);
+        uploadAndDraw(x, y, w, h);
 
-        GlStateManager._glUseProgram(0);
-        GlStateManager._disableBlend();
+        // ✅ Восстанавливаем состояние MC
+        restoreMcState();
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -322,7 +314,7 @@ public class DrawHelper {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // CORE SDF (rounded_rect shader)
+    // CORE SDF (rounded_rect)
     // ══════════════════════════════════════════════════════════════
 
     private static void sdf(Matrix4f mat,
@@ -363,17 +355,17 @@ public class DrawHelper {
         u1fp(progRect, "u_GlowRadius", glowColor != null ? glowRadius : 0f);
         u1fp(progRect, "u_Time",       time < 0 ? 0f : time);
 
-        uploadQuad(x, y, w, h);
+        uploadAndDraw(x, y, w, h);
 
-        GlStateManager._glUseProgram(0);
-        GlStateManager._disableBlend();
+        // ✅ Восстанавливаем состояние MC
+        restoreMcState();
     }
 
     // ══════════════════════════════════════════════════════════════
-    // VAO/VBO upload
+    // UPLOAD + DRAW
     // ══════════════════════════════════════════════════════════════
 
-    private static void uploadQuad(float x, float y, float w, float h) {
+    private static void uploadAndDraw(float x, float y, float w, float h) {
         VERT_BUF.clear();
         VERT_BUF.put(x  ).put(y  ).put(0).put(0).put(0);
         VERT_BUF.put(x  ).put(y+h).put(0).put(0).put(1);
@@ -385,12 +377,10 @@ public class DrawHelper {
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboId);
         GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, 0, VERT_BUF);
         GL11.glDrawArrays(GL11.GL_TRIANGLE_FAN, 0, 4);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-        GL30.glBindVertexArray(0);
     }
 
     // ══════════════════════════════════════════════════════════════
-    // GL HELPERS — принимают явный programId
+    // GL HELPERS
     // ══════════════════════════════════════════════════════════════
 
     private static void u1fp(int prog, String n, float a) {
