@@ -2,6 +2,7 @@ package com.example.ui.newmenu.element;
 
 import com.example.util.render.DrawHelper;
 import com.example.util.render.Fonts;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -109,11 +110,7 @@ public class Menu extends Screen {
 
         Matrix4f m = ms.peek().getPositionMatrix();
 
-        // ── ПОРЯДОК РЕНДЕРА ─────────────────────────────────────
-        // 1. Вся геометрия (шейдеры)
-        // 2. Текст ПОСЛЕДНИМ — иначе шейдер сбивает шрифт
-
-        // ── HEADER геометрия ─────────────────────────────────────
+        // ── HEADER геометрия ──────────────────────────────────────
         DrawHelper.drawStyledRect(m, x, y, CONTENT_W, HEADER_H, 12, 12, 0, 0,
             new Color(22, 24, 34, a));
         DrawHelper.drawGradientH(m, x, y, CONTENT_W * 0.5f, HEADER_H,
@@ -135,7 +132,7 @@ public class Menu extends Screen {
             new Color(45, 50, 95, (int)(40 * openAnim)),
             new Color(22, 24, 34, 0));
 
-        // ── Outline ──────────────────────────────────────────────
+        // ── Outline ───────────────────────────────────────────────
         DrawHelper.drawOutline(ms, x - 1, y - 1, CONTENT_W + 2, TOTAL_H + 2,
             12, new Color(48, 47, 68, a), 1);
 
@@ -150,7 +147,7 @@ public class Menu extends Screen {
         DrawHelper.drawGradientV(ctx, x, fy - 10, CONTENT_W, 10,
             new Color(14, 16, 21, 0), new Color(14, 16, 21, a));
 
-        // ── Scrollbar ────────────────────────────────────────────
+        // ── Scrollbar ─────────────────────────────────────────────
         if (maxScroll > 1f) {
             float trkH = CONTENT_H - 8;
             float tmbH = Math.max(12, trkH * CONTENT_H / (CONTENT_H + maxScroll));
@@ -164,25 +161,36 @@ public class Menu extends Screen {
 
         // ════════════════════════════════════════════════════════
         // ВЕСЬ ТЕКСТ — ТОЛЬКО В САМОМ КОНЦЕ
+        // ✅ ФИКС: явно включаем blend перед любым текстом
         // ════════════════════════════════════════════════════════
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+
         float textY = y + (HEADER_H - Fonts.height()) / 2f;
 
+        // "Nocturn" bold + " Client" medium — позиционируем через boldWidth
         DrawHelper.drawTextBoldShadow(ctx, "Nocturn", x + 10, textY,
             new Color(197, 200, 255, a));
         DrawHelper.drawTextShadow(ctx, " Client",
             x + 10 + Fonts.boldWidth("Nocturn"), textY,
             new Color(125, 136, 255, a));
 
+        // ✅ ФИКС: catName центруем через mediumWidth — drawText рендерит medium
         String catName = categoryElement.getSelectedCategory().getDisplayName();
+        float  catW    = Fonts.mediumWidth(catName);
         DrawHelper.drawText(ctx, catName,
-            x + (CONTENT_W - Fonts.width(catName)) / 2f, textY,
+            x + (CONTENT_W - catW) / 2f, textY,
             new Color(130, 133, 180, a));
 
+        // Версия справа — тоже mediumWidth
         String ver = "v1.0 / 1.21.4";
         DrawHelper.drawText(ctx, ver,
-            x + CONTENT_W - Fonts.width(ver) - 10, textY,
+            x + CONTENT_W - Fonts.mediumWidth(ver) - 10, textY,
             new Color(55, 58, 88, a));
 
+        RenderSystem.disableBlend();
+
+        // Footer (рисует свою геометрию + текст кнопок категорий)
         categoryElement.renderFooter(ctx, x, fy, CONTENT_W, FOOTER_H, openAnim);
 
         ms.pop();
