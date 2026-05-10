@@ -113,13 +113,15 @@ public class DrawHelper {
 
     // ══════════════════════════════════════════════════════════════
     // RESTORE STATE после нашего шейдера
+    // ✅ ГЛАВНЫЙ ФИКС: убрали _disableBlend() — он убивал весь текст
     // ══════════════════════════════════════════════════════════════
 
     private static void restore() {
         GL30.glBindVertexArray(0);
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
         GlStateManager._glUseProgram(0);
-        GlStateManager._disableBlend();
+        // ❌ БЫЛО: GlStateManager._disableBlend(); — это убивало рендер текста
+        // ✅ НЕ отключаем blend — Minecraft сам управляет им через RenderSystem
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -167,7 +169,6 @@ public class DrawHelper {
             new Color(0, 0, 0, 0), c, thickness, null, 0, -1);
     }
 
-    // ✅ ВОЗВРАЩЁН — используется в CategoryElement и других местах
     public static void drawGlow(Matrix4f m, float x, float y, float w, float h,
                                 float radius, float spread, Color color) {
         sdf(m,
@@ -244,7 +245,7 @@ public class DrawHelper {
         buf.vertex(m, x+w, y,   0).color(right.getRed(), right.getGreen(), right.getBlue(), right.getAlpha());
         buf.vertex(m, x,   y,   0).color(left.getRed(),  left.getGreen(),  left.getBlue(),  left.getAlpha());
         BufferRenderer.drawWithGlobalProgram(buf.end());
-        RenderSystem.disableBlend();
+        // ✅ НЕ вызываем disableBlend() — иначе убьём текст после
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -252,23 +253,38 @@ public class DrawHelper {
     // ══════════════════════════════════════════════════════════════
 
     public static void drawText(DrawContext ctx, String text, float x, float y, Color c) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         ctx.drawText(Fonts.get(), Fonts.medium(text), (int)x, (int)y, c.getRGB(), false);
     }
+
     public static void drawTextBold(DrawContext ctx, String text, float x, float y, Color c) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         ctx.drawText(Fonts.get(), Fonts.bold(text), (int)x, (int)y, c.getRGB(), false);
     }
+
     public static void drawTextShadow(DrawContext ctx, String text, float x, float y, Color c) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         ctx.drawText(Fonts.get(), Fonts.medium(text), (int)x, (int)y, c.getRGB(), true);
     }
+
     public static void drawTextBoldShadow(DrawContext ctx, String text, float x, float y, Color c) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         ctx.drawText(Fonts.get(), Fonts.bold(text), (int)x, (int)y, c.getRGB(), true);
     }
+
     public static void drawTextRegular(DrawContext ctx, String text, float x, float y, Color c) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         ctx.drawText(Fonts.get(), Fonts.regular(text), (int)x, (int)y, c.getRGB(), false);
     }
 
     // ══════════════════════════════════════════════════════════════
     // RAW RECT
+    // ✅ ФИКС: убрали disableBlend() в конце
     // ══════════════════════════════════════════════════════════════
 
     public static void drawRectRaw(Matrix4f m, float x, float y, float w, float h, Color c) {
@@ -285,7 +301,7 @@ public class DrawHelper {
         buf.vertex(m, x+w, y,   0).color(r, g, b, a);
         buf.vertex(m, x,   y,   0).color(r, g, b, a);
         BufferRenderer.drawWithGlobalProgram(buf.end());
-        RenderSystem.disableBlend();
+        // ✅ НЕ вызываем disableBlend()
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -369,27 +385,19 @@ public class DrawHelper {
     // ══════════════════════════════════════════════════════════════
 
     private static void u1f(int p, String n, float a) {
-        int l = GL20.glGetUniformLocation(p, n);
-        if (l >= 0) GL20.glUniform1f(l, a);
+        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform1f(l, a);
     }
     private static void u2f(int p, String n, float a, float b) {
-        int l = GL20.glGetUniformLocation(p, n);
-        if (l >= 0) GL20.glUniform2f(l, a, b);
+        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform2f(l, a, b);
     }
     private static void u3f(int p, String n, float a, float b, float c) {
-        int l = GL20.glGetUniformLocation(p, n);
-        if (l >= 0) GL20.glUniform3f(l, a, b, c);
+        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform3f(l, a, b, c);
     }
     private static void u4f(int p, String n, float a, float b, float c, float d) {
-        int l = GL20.glGetUniformLocation(p, n);
-        if (l >= 0) GL20.glUniform4f(l, a, b, c, d);
+        int l = GL20.glGetUniformLocation(p, n); if (l >= 0) GL20.glUniform4f(l, a, b, c, d);
     }
     private static void setMat4(int p, String n, Matrix4f mat) {
         int l = GL20.glGetUniformLocation(p, n);
-        if (l >= 0) {
-            MAT_BUF.clear();
-            mat.get(MAT_BUF);
-            GL20.glUniformMatrix4fv(l, false, MAT_BUF);
-        }
+        if (l >= 0) { MAT_BUF.clear(); mat.get(MAT_BUF); GL20.glUniformMatrix4fv(l, false, MAT_BUF); }
     }
 }
