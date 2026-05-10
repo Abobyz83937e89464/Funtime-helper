@@ -2,6 +2,7 @@ package com.example.ui.newmenu.element;
 
 import com.example.util.render.DrawHelper;
 import com.example.util.render.Fonts;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
@@ -42,8 +43,7 @@ public class ModuleElement {
 
         Color rainbow = DrawHelper.getRainbow(idxOffset, 4f, 0.55f, 1f, 255);
 
-        // ── 1. Карточка через module_card шейдер ──────────────────
-        // ✅ drawGlow убран — именно он рисовал второй радужный слой вокруг
+        // ── 1. Карточка ───────────────────────────────────────────
         DrawHelper.drawModuleCard(m, x, panelY, modW, PANEL_H, rad,
                                   idxOffset, ta, ha, rainbow);
 
@@ -61,13 +61,17 @@ public class ModuleElement {
         DrawHelper.drawOutline(ms, tx2, ty2, tw, th, th / 2f,
             new Color(33, 32, 43), 1);
 
-        // Кружок тоггла — плавно едет вправо при включении
         float cs  = th - 4f;
         float kcx = tx2 + 2f + ta * (tw - cs - 4f);
         DrawHelper.drawCircle(m, kcx + cs / 2f, ty2 + th / 2f, 14, cs / 2f,
             new Color(200, 205, 255));
 
-        // ── 3. ТЕКСТ — строго последним ───────────────────────────
+        // ── 3. ТЕКСТ — строго последним + восстанавливаем blend ───
+        // ✅ ФИКС: после сырых GL шейдеров restore() отключает blend →
+        //          ctx.drawText() без blend = текст невидим
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+
         // Имя модуля (над карточкой)
         Color baseNameC = new Color(100, 103, 145);
         Color nameColor = new Color(
@@ -76,7 +80,7 @@ public class ModuleElement {
             clamp((int)(baseNameC.getBlue()  + (rainbow.getBlue()  - baseNameC.getBlue())  * ta)));
         DrawHelper.drawTextBold(ctx, mod.name, x, y, nameColor);
 
-        // Статус (внутри карточки)
+        // Статус внутри карточки
         float statusY = panelY + (PANEL_H - Fonts.height()) / 2f;
         Color statusC = mod.enabled
             ? new Color(
@@ -87,6 +91,8 @@ public class ModuleElement {
             : new Color(80, 83, 120);
         DrawHelper.drawText(ctx, mod.enabled ? "Enabled" : "Disabled",
                             x + 8, statusY, statusC);
+
+        RenderSystem.disableBlend();
     }
 
     public boolean mouseClicked(float x, float y, float modW,
